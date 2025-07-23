@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой тест кнопок</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        
+        button {
+            padding: 15px 25px;
+            margin: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        
+        .result {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Простой тест кнопок JavaScript</h1>
+    
+    <p>Эта страница тестирует базовую работу JavaScript и кнопок:</p>
+    
+    <button id="testBtn1" class="btn-primary">
+        Тест 1: Простой alert
+    </button>
+    
+    <button id="testBtn2" class="btn-danger">
+        Тест 2: Изменить текст
+    </button>
+    
+    <button id="testBtn3" class="btn-success">
+        Тест 3: history.back()
+    </button>
+    
+    <div id="result" class="result">
+        Результат тестов появится здесь...
+    </div>
+    
+    <script>
+        console.log('Simple test: Скрипт загружен');
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Simple test: DOM загружен');
+            
+            const resultDiv = document.getElementById('result');
+            
+            function updateResult(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                resultDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+                console.log(`Simple test: ${message}`);
+            }
+            
+            updateResult('✅ JavaScript работает, DOM загружен');
+            
+            // Тест 1: Простой alert
+            const testBtn1 = document.getElementById('testBtn1');
+            if (testBtn1) {
+                testBtn1.addEventListener('click', () => {
+                    updateResult('👆 Кнопка 1 нажата');
+                    alert('Тест 1 пройден! JavaScript и кнопки работают.');
+                });
+                updateResult('✅ Обработчик кнопки 1 настроен');
+            } else {
+                updateResult('❌ Кнопка 1 не найдена');
+            }
+            
+            // Тест 2: Изменить текст
+            const testBtn2 = document.getElementById('testBtn2');
+            if (testBtn2) {
+                testBtn2.addEventListener('click', () => {
+                    updateResult('👆 Кнопка 2 нажата');
+                    testBtn2.textContent = 'Тест 2: ✅ Текст изменен!';
+                    testBtn2.style.background = '#6f42c1';
+                });
+                updateResult('✅ Обработчик кнопки 2 настроен');
+            } else {
+                updateResult('❌ Кнопка 2 не найдена');
+            }
+            
+            // Тест 3: history.back()
+            const testBtn3 = document.getElementById('testBtn3');
+            if (testBtn3) {
+                testBtn3.addEventListener('click', () => {
+                    updateResult('👆 Кнопка 3 нажата');
+                    updateResult('🔙 Выполняем history.back()');
+                    try {
+                        window.history.back();
+                        updateResult('✅ history.back() выполнен');
+                    } catch (error) {
+                        updateResult(`❌ Ошибка history.back(): ${error.message}`);
+                        // Fallback
+                        window.location.href = 'https://www.google.com';
+                    }
+                });
+                updateResult('✅ Обработчик кнопки 3 настроен');
+            } else {
+                updateResult('❌ Кнопка 3 не найдена');
+            }
+            
+            updateResult('🎉 Все тесты настроены успешно');
+        });
+        
+        // Отлавливаем ошибки
+        window.addEventListener('error', (event) => {
+            console.error('JavaScript error:', event.error);
+            const resultDiv = document.getElementById('result');
+            if (resultDiv) {
+                resultDiv.innerHTML += `<div style="color: red;">💥 JavaScript ошибка: ${event.error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html> 

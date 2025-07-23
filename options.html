@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Настройки</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="options-container">
+        <header class="header">
+            <div class="header-content">
+                <img src="icons/icon48.png" alt="SafeLink" class="logo">
+                <div class="header-text">
+                    <h1>SafeLink</h1>
+                    <p>Настройки защиты от опасных ссылок</p>
+                </div>
+                <div class="version-info">
+                    <span class="version">v1.0.0</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="navigation">
+            <button class="nav-btn active" data-tab="protection">🛡️ Защита</button>
+            <button class="nav-btn" data-tab="lists">📋 Списки</button>
+            <button class="nav-btn" data-tab="pro">⭐ PRO</button>
+            <button class="nav-btn" data-tab="stats">📊 Статистика</button>
+            <button class="nav-btn" data-tab="about">ℹ️ О программе</button>
+        </nav>
+
+        <main class="content">
+            <!-- Вкладка "Защита" -->
+            <div class="tab-content active" id="protection">
+                <div class="section">
+                    <h2>Режим защиты</h2>
+                    <div class="setting-group">
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="blockMode" value="disabled">
+                                <span class="radio-custom"></span>
+                                <div class="radio-label">
+                                    <strong>Отключена</strong>
+                                    <p>Защита полностью отключена</p>
+                                </div>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="blockMode" value="warn" checked>
+                                <span class="radio-custom"></span>
+                                <div class="radio-label">
+                                    <strong>Предупреждение</strong>
+                                    <p>Показывать предупреждение перед переходом</p>
+                                </div>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="blockMode" value="block">
+                                <span class="radio-custom"></span>
+                                <div class="radio-label">
+                                    <strong>Блокировка</strong>
+                                    <p>Полностью блокировать опасные сайты</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Дополнительные настройки</h2>
+                    <div class="setting-group">
+                        <label class="toggle-option">
+                            <input type="checkbox" id="markLinks">
+                            <span class="toggle"></span>
+                            <div class="toggle-label">
+                                <strong>Выделять опасные ссылки</strong>
+                                <p>Добавлять визуальные индикаторы к потенциально опасным ссылкам на страницах</p>
+                            </div>
+                        </label>
+
+                        <label class="toggle-option">
+                            <input type="checkbox" id="showNotifications">
+                            <span class="toggle"></span>
+                            <div class="toggle-label">
+                                <strong>Показывать уведомления</strong>
+                                <p>Отображать уведомления о заблокированных угрозах</p>
+                            </div>
+                        </label>
+
+                        <label class="toggle-option">
+                            <input type="checkbox" id="collectStats">
+                            <span class="toggle"></span>
+                            <div class="toggle-label">
+                                <strong>Собирать статистику</strong>
+                                <p>Ведение статистики заблокированных и разрешенных сайтов</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка "Списки" -->
+            <div class="tab-content" id="lists">
+                <div class="section">
+                    <h2>Заблокированные сайты</h2>
+                    <div class="list-manager">
+                        <div class="list-header">
+                            <div class="add-form">
+                                <input type="text" id="newBlockedSite" placeholder="Введите домен (например: example.com)">
+                                <button class="btn btn-primary" id="addBlockedSite">Добавить</button>
+                            </div>
+                        </div>
+                        <div class="list-content">
+                            <ul class="site-list" id="blockedSitesList">
+                                <!-- Заполняется динамически -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Разрешенные сайты</h2>
+                    <div class="list-manager">
+                        <div class="list-header">
+                            <div class="add-form">
+                                <input type="text" id="newAllowedSite" placeholder="Введите домен (например: example.com)">
+                                <button class="btn btn-primary" id="addAllowedSite">Добавить</button>
+                            </div>
+                        </div>
+                        <div class="list-content">
+                            <ul class="site-list" id="allowedSitesList">
+                                <!-- Заполняется динамически -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Управление списками</h2>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="exportLists">📥 Экспорт списков</button>
+                        <button class="btn btn-secondary" id="importLists">📤 Импорт списков</button>
+                        <button class="btn btn-danger" id="resetLists">🔄 Сбросить списки</button>
+                    </div>
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </div>
+            </div>
+
+            <!-- Вкладка "PRO" -->
+            <div class="tab-content" id="pro">
+                <div class="pro-header">
+                    <div class="pro-badge">
+                        <span class="pro-icon">⭐</span>
+                        <h2>SafeLink PRO</h2>
+                    </div>
+                    <div class="pro-status" id="proStatus">
+                        <span class="status-indicator"></span>
+                        <span class="status-text">Не активирована</span>
+                    </div>
+                </div>
+
+                <div class="pro-features">
+                    <h3>Возможности PRO версии:</h3>
+                    <ul class="features-list">
+                        <li>🔄 Автоматическое обновление базы угроз</li>
+                        <li>🌐 Синхронизация с глобальным реестром</li>
+                        <li>📊 Расширенная статистика и аналитика</li>
+                        <li>🚀 Приоритетная техническая поддержка</li>
+                        <li>🎯 Персонализированные настройки безопасности</li>
+                        <li>📱 Синхронизация между устройствами</li>
+                    </ul>
+                </div>
+
+                <div class="pro-settings" id="proSettings" style="display: none;">
+                    <div class="section">
+                        <h3>Настройки PRO</h3>
+                        <div class="setting-group">
+                            <label class="toggle-option">
+                                <input type="checkbox" id="autoSync">
+                                <span class="toggle"></span>
+                                <div class="toggle-label">
+                                    <strong>Автоматическая синхронизация</strong>
+                                    <p>Ежедневное обновление базы данных угроз из облачного реестра</p>
+                                </div>
+                            </label>
+
+                            <div class="sync-info">
+                                <p><strong>Последняя синхронизация:</strong> <span id="lastSync">Никогда</span></p>
+                                <button class="btn btn-secondary" id="manualSync">🔄 Синхронизировать сейчас</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pro-activation">
+                    <div class="activation-form" id="activationForm">
+                        <h3>Активация PRO версии</h3>
+                        <div class="input-group">
+                            <input type="text" id="licenseKey" placeholder="Введите лицензионный ключ">
+                            <button class="btn btn-primary" id="activatePro">Активировать</button>
+                        </div>
+                        <p class="activation-note">
+                            Нет лицензии? <a href="https://safelink-pro.com" target="_blank">Приобрести PRO версию</a>
+                        </p>
+                    </div>
+
+                    <div class="deactivation-form" id="deactivationForm" style="display: none;">
+                        <button class="btn btn-danger" id="deactivatePro">Деактивировать PRO</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка "Статистика" -->
+            <div class="tab-content" id="stats">
+                <div class="stats-overview">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🛡️</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalBlocked">0</div>
+                                <div class="stat-label">Заблокировано угроз</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="totalAllowed">0</div>
+                                <div class="stat-label">Разрешено сайтов</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">⏰</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="daysActive">0</div>
+                                <div class="stat-label">Дней защиты</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-info">
+                                <div class="stat-number" id="efficiencyRate">99%</div>
+                                <div class="stat-label">Эффективность</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>История защиты</h2>
+                    <div class="history-list" id="protectionHistory">
+                        <!-- Заполняется динамически -->
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="exportStats">📊 Экспорт статистики</button>
+                        <button class="btn btn-danger" id="clearStats">🗑️ Очистить статистику</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка "О программе" -->
+            <div class="tab-content" id="about">
+                <div class="about-section">
+                    <div class="about-header">
+                        <img src="icons/icon128.png" alt="SafeLink" class="about-logo">
+                        <div class="about-info">
+                            <h2>SafeLink</h2>
+                            <p class="version">Версия 1.0.0</p>
+                            <p class="description">Надежная защита от опасных ссылок в интернете</p>
+                        </div>
+                    </div>
+
+                    <div class="about-details">
+                        <h3>О расширении</h3>
+                        <p>SafeLink — это комплексное решение для защиты от вредоносных, фишинговых и мошеннических сайтов. Расширение анализирует ссылки в режиме реального времени и предотвращает переходы на опасные ресурсы.</p>
+
+                        <h3>Возможности</h3>
+                        <ul>
+                            <li>Проверка ссылок в режиме реального времени</li>
+                            <li>База данных известных угроз</li>
+                            <li>Настраиваемые режимы защиты</li>
+                            <li>Управление списками разрешенных и заблокированных сайтов</li>
+                            <li>Подробная статистика безопасности</li>
+                            <li>PRO версия с облачной синхронизацией</li>
+                        </ul>
+
+                        <h3>Поддержка</h3>
+                        <div class="support-links">
+                            <a href="https://safelink-support.com" class="support-link" target="_blank">
+                                📖 Документация
+                            </a>
+                            <a href="https://safelink-support.com/contact" class="support-link" target="_blank">
+                                💬 Техподдержка
+                            </a>
+                            <a href="https://github.com/safelink/chrome-extension" class="support-link" target="_blank">
+                                🐛 Сообщить об ошибке
+                            </a>
+                        </div>
+
+                        <div class="copyright">
+                            <p>&copy; 2024 SafeLink. Все права защищены.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html> 

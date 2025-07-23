@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Предупреждение о небезопасной ссылке</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .warning-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+        }
+
+        .warning-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .warning-title {
+            font-size: 28px;
+            color: #e74c3c;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .url-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: monospace;
+            word-break: break-all;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .countdown {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .extension-debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 350px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="extension-debug" id="extensionDebug">
+        Extension Debug Log:
+    </div>
+
+    <div class="warning-container">
+        <div class="warning-icon">⚠️</div>
+        
+        <h1 class="warning-title">ВНИМАНИЕ! Обнаружена потенциально опасная ссылка</h1>
+        
+        <p style="margin-bottom: 20px;">SafeLink заблокировал переход на подозрительный сайт:</p>
+        
+        <div class="url-display" id="dangerUrl">
+            Загрузка URL...
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+            <h3 style="margin-bottom: 10px;">🛡️ Причины блокировки:</h3>
+            <ul id="reasonsList" style="text-align: left; margin-left: 20px;">
+                <li>Сайт находится в базе данных угроз SafeLink</li>
+                <li>Обнаружены признаки мошенничества</li>
+            </ul>
+        </div>
+
+        <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+            <h3 style="margin-bottom: 10px;">📊 Статистика защиты:</h3>
+            <p>SafeLink заблокировал <strong><span id="blockedCount">0</span></strong> угроз</p>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="goBackBtn">
+                ← Вернуться назад
+            </button>
+            
+            <button class="btn btn-secondary" id="allowSiteBtn">
+                Разрешить сайт
+            </button>
+            
+            <button class="btn btn-danger" id="continueBtn">
+                Всё равно перейти (<span class="countdown" id="countdown">10</span>)
+            </button>
+        </div>
+
+        <div class="safelink-info">
+            <p><strong>SafeLink</strong> - ваш надежный защитник в интернете</p>
+            <p>Мы анализируем миллионы ссылок ежедневно, чтобы обеспечить вашу безопасность</p>
+        </div>
+    </div>
+
+    <script src="warning-extension.js"></script>
+</body>
+</html> 

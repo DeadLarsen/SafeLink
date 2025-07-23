@@ -1,0 +1,256 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8f9fa;
+    color: #333;
+    width: 320px;
+    min-height: 400px;
+}
+
+.popup-container {
+    padding: 16px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.logo {
+    width: 32px;
+    height: 32px;
+    margin-right: 12px;
+}
+
+.header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1976d2;
+    flex: 1;
+}
+
+.version {
+    font-size: 12px;
+    color: #666;
+    background: #e3f2fd;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.status-section {
+    margin-bottom: 20px;
+}
+
+.protection-status {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #e8f5e8;
+    border-radius: 8px;
+    border-left: 4px solid #4caf50;
+}
+
+.protection-status.disabled {
+    background: #ffebee;
+    border-left-color: #f44336;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+    margin-right: 8px;
+}
+
+.status-indicator.disabled {
+    background: #f44336;
+}
+
+.stats {
+    display: flex;
+    gap: 16px;
+}
+
+.stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 12px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-number {
+    display: block;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1976d2;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #666;
+}
+
+.current-site {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.current-site h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.site-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.site-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.site-status.safe {
+    color: #4caf50;
+}
+
+.site-status.blocked {
+    color: #f44336;
+}
+
+.site-status.warning {
+    color: #ff9800;
+}
+
+.status-icon {
+    font-size: 16px;
+}
+
+.site-url {
+    font-size: 12px;
+    color: #666;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-primary {
+    background: #1976d2;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1565c0;
+}
+
+.btn-primary.danger {
+    background: #f44336;
+}
+
+.btn-primary.danger:hover {
+    background: #d32f2f;
+}
+
+.btn-secondary {
+    background: white;
+    color: #1976d2;
+    border: 1px solid #1976d2;
+}
+
+.btn-secondary:hover {
+    background: #e3f2fd;
+}
+
+.pro-section {
+    margin-bottom: 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.pro-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pro-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sync-status {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.last-sync {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
+}
+
+.footer-link {
+    color: #1976d2;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.footer-link:hover {
+    text-decoration: underline;
+} 

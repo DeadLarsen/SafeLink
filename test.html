@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Тестовая страница</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .dangerous-link {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .safe-link {
+            color: #28a745;
+        }
+        
+        .test-link {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        
+        .test-link:hover {
+            background: #f8f9fa;
+        }
+        
+        .dynamic-content {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ SafeLink - Тестовая страница</h1>
+    
+    <p>Эта страница создана для тестирования функциональности расширения SafeLink.</p>
+    
+    <div class="test-section">
+        <h2>🔗 Статические ссылки</h2>
+        <p>Эти ссылки присутствуют на странице при загрузке:</p>
+        
+        <a href="https://malware-site.com" class="test-link dangerous-link">
+            ⚠️ Опасная ссылка: malware-site.com (должна быть заблокирована)
+        </a>
+        
+        <a href="https://phishing-bank.net" class="test-link dangerous-link">
+            🎣 Фишинг: phishing-bank.net (должна быть заблокирована)
+        </a>
+        
+        <a href="https://fake-paypal.org" class="test-link dangerous-link">
+            💳 Поддельный PayPal: fake-paypal.org (должна быть заблокирована)
+        </a>
+        
+        <a href="https://google.com" class="test-link safe-link">
+            ✅ Безопасная ссылка: google.com (должна быть разрешена)
+        </a>
+        
+        <a href="https://github.com" class="test-link safe-link">
+            ✅ Безопасная ссылка: github.com (должна быть разрешена)
+        </a>
+        
+        <a href="https://www.rambler.ru/" class="test-link safe-link">
+            https://www.rambler.ru/
+        </a>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔄 Динамические ссылки</h2>
+        <p>Эти ссылки добавляются на страницу динамически:</p>
+        
+        <div id="dynamic-content" class="dynamic-content">
+            <p>Нажмите кнопки ниже для добавления ссылок:</p>
+        </div>
+        
+        <button id="addDangerousBtn">Добавить опасную ссылку</button>
+        <button id="addSafeBtn">Добавить безопасную ссылку</button>
+        <button id="clearBtn">Очистить</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎯 Внутренние ссылки</h2>
+        <p>Эти ссылки не должны проверяться SafeLink:</p>
+        
+        <a href="#section1" class="test-link">📍 Якорная ссылка: #section1</a>
+        <a href="/relative-path" class="test-link">📁 Относительная ссылка: /relative-path</a>
+        <a href="mailto:test@example.com" class="test-link">📧 Email ссылка: mailto:test@example.com</a>
+        <a href="tel:+1234567890" class="test-link">📞 Телефон: tel:+1234567890</a>
+        <a href="javascript:alert('test')" class="test-link">⚡ JavaScript: javascript:alert('test')</a>
+    </div>
+    
+    <div class="test-section">
+        <h2>📊 Тестирование функций</h2>
+        <p>Инструкции для тестирования:</p>
+        <ul>
+            <li><strong>Статические ссылки:</strong> Опасные ссылки должны быть выделены красной рамкой с иконкой предупреждения</li>
+            <li><strong>Клик по опасной ссылке:</strong> Должно появиться модальное окно с предупреждением</li>
+            <li><strong>Динамические ссылки:</strong> Новые ссылки должны сразу проверяться после добавления</li>
+            <li><strong>Внутренние ссылки:</strong> Не должны проверяться или блокироваться</li>
+            <li><strong>Настройки:</strong> Откройте попап расширения для проверки интерфейса</li>
+        </ul>
+    </div>
+    
+    <div id="section1" style="margin-top: 100px;">
+        <h2>📍 Секция 1</h2>
+        <p>Эта секция для тестирования якорных ссылок.</p>
+    </div>
+
+    <script src="test.js"></script>
+</body>
+</html> 

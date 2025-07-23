@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Предупреждение о небезопасной ссылке (DEBUG)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .warning-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+        }
+
+        .warning-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .warning-title {
+            font-size: 28px;
+            color: #e74c3c;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .url-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: monospace;
+            word-break: break-all;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .countdown {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="warning-container">
+        <div class="warning-icon">⚠️</div>
+        
+        <h1 class="warning-title">ВНИМАНИЕ! Обнаружена потенциально опасная ссылка</h1>
+        
+        <p style="margin-bottom: 20px;">SafeLink заблокировал переход на подозрительный сайт:</p>
+        
+        <div class="url-display" id="dangerUrl">
+            Загрузка URL...
+        </div>
+
+        <div class="debug-info" id="debugLog">
+            Лог отладки:
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="goBackBtn">
+                ← Вернуться назад
+            </button>
+            
+            <button class="btn btn-secondary" id="allowSiteBtn">
+                Разрешить сайт
+            </button>
+            
+            <button class="btn btn-danger" id="continueBtn">
+                Всё равно перейти (<span class="countdown" id="countdown">10</span>)
+            </button>
+        </div>
+
+        <div style="margin-top: 30px; color: #666; font-size: 14px;">
+            <p><strong>🧪 ОТЛАДОЧНАЯ ВЕРСИЯ</strong></p>
+            <p>Эта версия содержит подробное логирование для диагностики проблем</p>
+        </div>
+    </div>
+
+    <script>
+        // Функция для добавления в лог
+        function addToLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            const debugLog = document.getElementById('debugLog');
+            if (debugLog) {
+                debugLog.textContent += logEntry;
+                debugLog.scrollTop = debugLog.scrollHeight;
+            }
+            console.log(`SafeLink Debug: ${message}`);
+        }
+
+        // Отладочная версия WarningPage
+        class WarningPageDebug {
+            constructor() {
+                this.targetUrl = null;
+                this.countdown = 10;
+                this.countdownInterval = null;
+                this.contextInvalidatedShown = false;
+                
+                addToLog('🚀 WarningPageDebug инициализирован');
+                this.init();
+            }
+
+            init() {
+                addToLog('📋 Начинаем инициализацию...');
+                this.parseUrl();
+                this.loadStats();
+                this.setupEventListeners();
+                this.startCountdown();
+                addToLog('✅ Инициализация завершена');
+            }
+
+            parseUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                this.targetUrl = urlParams.get('url');
+                
+                addToLog(`🔍 URL из параметров: ${this.targetUrl}`);
+                
+                if (this.targetUrl) {
+                    document.getElementById('dangerUrl').textContent = this.targetUrl;
+                    addToLog('✅ URL установлен из параметров');
+                } else {
+                    this.targetUrl = 'https://malware-site.com/debug-test';
+                    document.getElementById('dangerUrl').textContent = this.targetUrl + ' (тестовый URL)';
+                    addToLog('⚠️ URL не найден, используется тестовый');
+                }
+            }
+
+            async loadStats() {
+                addToLog('📊 Загружаем статистику...');
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.storage) {
+                        const result = await chrome.storage.local.get(['safelink_stats']);
+                        addToLog('✅ Статистика загружена');
+                    } else {
+                        addToLog('⚠️ Chrome storage недоступен');
+                    }
+                } catch (error) {
+                    addToLog(`❌ Ошибка загрузки статистики: ${error.message}`);
+                }
+            }
+
+            setupEventListeners() {
+                addToLog('🔧 Настраиваем обработчики событий...');
+                
+                // Проверяем наличие элементов
+                const goBackBtn = document.getElementById('goBackBtn');
+                const allowSiteBtn = document.getElementById('allowSiteBtn');
+                const continueBtn = document.getElementById('continueBtn');
+                
+                addToLog(`🔍 Элементы найдены: goBack=${!!goBackBtn}, allowSite=${!!allowSiteBtn}, continue=${!!continueBtn}`);
+
+                if (goBackBtn) {
+                    goBackBtn.addEventListener('click', () => {
+                        addToLog('👆 Клик по кнопке "Вернуться назад"');
+                        this.goBack();
+                    });
+                    addToLog('✅ Обработчик goBackBtn настроен');
+                } else {
+                    addToLog('❌ Элемент goBackBtn не найден!');
+                }
+
+                if (allowSiteBtn) {
+                    allowSiteBtn.addEventListener('click', () => {
+                        addToLog('👆 Клик по кнопке "Разрешить сайт"');
+                        this.allowSite();
+                    });
+                    addToLog('✅ Обработчик allowSiteBtn настроен');
+                } else {
+                    addToLog('❌ Элемент allowSiteBtn не найден!');
+                }
+
+                if (continueBtn) {
+                    continueBtn.addEventListener('click', () => {
+                        addToLog('👆 Клик по кнопке "Всё равно перейти"');
+                        this.continueTo();
+                    });
+                    addToLog('✅ Обработчик continueBtn настроен');
+                } else {
+                    addToLog('❌ Элемент continueBtn не найден!');
+                }
+
+                // Горячие клавиши
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        addToLog('⌨️ Нажата клавиша Escape');
+                        this.goBack();
+                    }
+                });
+                addToLog('⌨️ Горячие клавиши настроены');
+            }
+
+            startCountdown() {
+                const countdownElement = document.getElementById('countdown');
+                const continueBtn = document.getElementById('continueBtn');
+                
+                if (!countdownElement || !continueBtn) {
+                    addToLog('❌ Элементы countdown или continueBtn не найдены');
+                    return;
+                }
+                
+                continueBtn.disabled = true;
+                addToLog(`⏰ Начат обратный отсчет: ${this.countdown} секунд`);
+                
+                this.countdownInterval = setInterval(() => {
+                    this.countdown--;
+                    countdownElement.textContent = this.countdown;
+                    addToLog(`⏰ Обратный отсчет: ${this.countdown}`);
+                    
+                    if (this.countdown <= 0) {
+                        clearInterval(this.countdownInterval);
+                        continueBtn.disabled = false;
+                        continueBtn.innerHTML = 'Всё равно перейти';
+                        addToLog('✅ Обратный отсчет завершен, кнопка активирована');
+                    }
+                }, 1000);
+            }
+
+            goBack() {
+                addToLog('🔙 Выполняем возврат назад');
+                try {
+                    window.history.back();
+                    addToLog('✅ window.history.back() выполнен');
+                } catch (error) {
+                    addToLog(`❌ Ошибка при возврате: ${error.message}`);
+                    // Fallback - перенаправляем на безопасную страницу
+                    window.location.href = 'https://www.google.com';
+                }
+            }
+
+            async allowSite() {
+                addToLog('✅ Разрешаем сайт');
+                if (!this.targetUrl) {
+                    addToLog('❌ targetUrl не установлен');
+                    return;
+                }
+
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime) {
+                        await chrome.runtime.sendMessage({
+                            action: 'allowSite',
+                            url: this.targetUrl
+                        });
+                        addToLog('✅ Сайт добавлен в исключения');
+                    } else {
+                        addToLog('⚠️ Chrome runtime недоступен');
+                    }
+
+                    // Переходим на сайт
+                    addToLog(`🔗 Переходим на: ${this.targetUrl}`);
+                    window.location.href = this.targetUrl;
+                } catch (error) {
+                    addToLog(`❌ Ошибка при разрешении сайта: ${error.message}`);
+                }
+            }
+
+            async continueTo() {
+                addToLog(`🚀 Попытка перехода на: ${this.targetUrl}`);
+                
+                if (!this.targetUrl) {
+                    addToLog('❌ targetUrl не установлен!');
+                    alert('Ошибка: URL назначения не найден');
+                    return;
+                }
+
+                try {
+                    // Если это тестовый URL, показываем предупреждение
+                    if (this.targetUrl.includes('malware-site.com') || this.targetUrl.includes('debug-test')) {
+                        const proceed = confirm(
+                            'Это отладочная версия.\n\n' +
+                            `URL назначения: ${this.targetUrl}\n\n` +
+                            'Продолжить? (будет перенаправление на Google)'
+                        );
+                        
+                        if (!proceed) {
+                            addToLog('🚫 Пользователь отменил переход');
+                            return;
+                        }
+                        
+                        addToLog('🔗 Перенаправляем на Google (безопасно)');
+                        window.location.href = 'https://www.google.com/search?q=SafeLink+debug+test+completed';
+                        return;
+                    }
+
+                    // Обычный переход
+                    addToLog(`🔗 Переходим на: ${this.targetUrl}`);
+                    window.location.href = this.targetUrl;
+                } catch (error) {
+                    addToLog(`❌ Ошибка перехода: ${error.message}`);
+                    window.location.href = this.targetUrl;
+                }
+            }
+        }
+
+        // Инициализируем после загрузки DOM
+        document.addEventListener('DOMContentLoaded', () => {
+            addToLog('🌟 DOM загружен, создаем WarningPageDebug');
+            window.warningPageDebug = new WarningPageDebug();
+        });
+
+        // Отлавливаем ошибки JavaScript
+        window.addEventListener('error', (event) => {
+            addToLog(`💥 JavaScript ошибка: ${event.error.message}`);
+            console.error('JavaScript error:', event.error);
+        });
+
+        addToLog('📄 Скрипт загружен');
+    </script>
+</body>
+</html> 

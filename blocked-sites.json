@@ -1,0 +1,53 @@
+{
+  "blocked": [
+    "malware-site.com",
+    "phishing-bank.net",
+    "fake-paypal.org",
+    "virus-download.ru",
+    "scam-lottery.com",
+    "fake-amazon.net",
+    "phishing-google.org",
+    "malicious-ads.com",
+    "crypto-scam.net",
+    "fake-microsoft.org",
+    "dangerous-download.ru",
+    "phishing-facebook.com",
+    "scam-investment.net",
+    "malware-hosting.org",
+    "fake-antivirus.com",
+    "phishing-apple.net",
+    "suspicious-link.ru",
+    "malicious-redirect.com",
+    "fake-security.org",
+    "scam-support.net"
+  ],
+  "categories": {
+    "phishing": [
+      "fake-paypal.org",
+      "phishing-bank.net",
+      "phishing-google.org",
+      "phishing-facebook.com",
+      "phishing-apple.net"
+    ],
+    "malware": [
+      "malware-site.com",
+      "virus-download.ru",
+      "dangerous-download.ru",
+      "malware-hosting.org"
+    ],
+    "scam": [
+      "scam-lottery.com",
+      "crypto-scam.net",
+      "scam-investment.net",
+      "scam-support.net"
+    ],
+    "fake_services": [
+      "fake-amazon.net",
+      "fake-microsoft.org",
+      "fake-antivirus.com",
+      "fake-security.org"
+    ]
+  },
+  "version": "1.0.0",
+  "updated": "2024-01-15T00:00:00Z"
+} 

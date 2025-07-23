@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <img src="icons/icon48.png" alt="SafeLink" class="logo">
+            <h1>SafeLink</h1>
+            <span class="version" id="version">v1.0.0</span>
+        </div>
+
+        <div class="status-section">
+            <div class="protection-status" id="protectionStatus">
+                <div class="status-indicator active"></div>
+                <span>Защита активна</span>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="blockedCount">0</span>
+                    <span class="stat-label">Заблокировано</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="allowedCount">0</span>
+                    <span class="stat-label">Разрешено</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="current-site" id="currentSite">
+            <h3>Текущий сайт</h3>
+            <div class="site-info">
+                <div class="site-status safe" id="siteStatus">
+                    <span class="status-icon">✓</span>
+                    <span class="status-text">Безопасен</span>
+                </div>
+                <div class="site-url" id="siteUrl">example.com</div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <button id="toggleProtection" class="btn btn-primary">
+                <span id="toggleText">Отключить защиту</span>
+            </button>
+            
+            <button id="allowSite" class="btn btn-secondary" style="display: none;">
+                <span>Разрешить сайт</span>
+            </button>
+
+            <button id="reportSite" class="btn btn-secondary">
+                <span>Пожаловаться</span>
+            </button>
+        </div>
+
+        <div class="pro-section" id="proSection" style="display: none;">
+            <div class="pro-status">
+                <span class="pro-badge">PRO</span>
+                <span class="sync-status" id="syncStatus">Синхронизация: активна</span>
+            </div>
+            <div class="last-sync" id="lastSync">
+                Последнее обновление: сегодня
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="#" id="openOptions" class="footer-link">Настройки</a>
+            <a href="#" id="openHelp" class="footer-link">Помощь</a>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html> 

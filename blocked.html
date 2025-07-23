@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Доступ заблокирован</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .blocked-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            width: 90%;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .blocked-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #e74c3c;
+        }
+
+        .blocked-icon {
+            font-size: 100px;
+            margin-bottom: 20px;
+            color: #e74c3c;
+            animation: shake 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(10px); }
+        }
+
+        .blocked-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #e74c3c;
+            margin-bottom: 20px;
+        }
+
+        .blocked-subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .danger-url {
+            background: #fff5f5;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #e74c3c;
+        }
+
+        .threat-info {
+            background: #fee;
+            border: 2px solid #fcc;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .threat-info h3 {
+            color: #c53030;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .threat-types {
+            list-style: none;
+            padding: 0;
+        }
+
+        .threat-types li {
+            padding: 10px 0;
+            border-bottom: 1px solid #fed7d7;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .threat-types li:last-child {
+            border-bottom: none;
+        }
+
+        .threat-icon {
+            font-size: 16px;
+            width: 20px;
+        }
+
+        .protection-info {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .protection-info h3 {
+            color: #2f855a;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #2b6cb0;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2c5282;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #718096;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4a5568;
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #2b6cb0;
+            border: 2px solid #2b6cb0;
+        }
+
+        .btn-outline:hover {
+            background: #2b6cb0;
+            color: white;
+        }
+
+        .admin-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .admin-section h4 {
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+
+        .admin-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .safelink-branding {
+            margin-top: 30px;
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .safelink-logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2b6cb0;
+        }
+
+        .statistics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="blocked-container">
+        <div class="blocked-icon">🛡️</div>
+        
+        <h1 class="blocked-title">Доступ заблокирован</h1>
+        
+        <p class="blocked-subtitle">
+            SafeLink заблокировал доступ к этому сайту для защиты вашей безопасности
+        </p>
+
+        <div class="danger-url" id="dangerUrl">
+            Загрузка URL...
+        </div>
+
+        <div class="threat-info">
+            <h3>🚨 Обнаруженные угрозы:</h3>
+            <ul class="threat-types" id="threatTypes">
+                <li><span class="threat-icon">🦠</span>Вредоносное ПО</li>
+                <li><span class="threat-icon">🎣</span>Фишинг</li>
+                <li><span class="threat-icon">💰</span>Мошенничество</li>
+                <li><span class="threat-icon">📊</span>Кража данных</li>
+            </ul>
+        </div>
+
+        <div class="statistics">
+            <div class="stat-card">
+                <div class="stat-number" id="blockedToday">0</div>
+                <div class="stat-label">Заблокировано сегодня</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalBlocked">0</div>
+                <div class="stat-label">Всего заблокировано</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">99.9%</div>
+                <div class="stat-label">Точность обнаружения</div>
+            </div>
+        </div>
+
+        <div class="protection-info">
+            <h3>✅ Как SafeLink защитил вас:</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="padding: 5px 0;">• Проанализировал репутацию домена</li>
+                <li style="padding: 5px 0;">• Проверил базу данных угроз</li>
+                <li style="padding: 5px 0;">• Обнаружил подозрительные паттерны</li>
+                <li style="padding: 5px 0;">• Предотвратил потенциальный ущерб</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="goBackBtn">
+                ← Вернуться в безопасное место
+            </button>
+            
+            <button class="btn btn-outline" id="reportBtn">
+                📝 Сообщить об ошибке
+            </button>
+        </div>
+
+        <div class="admin-section">
+            <h4>Администраторам и опытным пользователям:</h4>
+            <div class="admin-controls">
+                <button class="btn btn-secondary" id="whitelistBtn">
+                    Добавить в исключения
+                </button>
+                <button class="btn btn-secondary" id="detailsBtn">
+                    Подробности угрозы
+                </button>
+            </div>
+            <p style="margin-top: 15px; font-size: 12px; color: #666;">
+                Внимание: разблокировка может подвергнуть систему риску
+            </p>
+        </div>
+
+        <div class="safelink-branding">
+            <div class="safelink-logo">SafeLink</div>
+            <p>Надежная защита в интернете • Обновлено сегодня</p>
+        </div>
+    </div>
+
+    <script src="blocked.js"></script>
+</body>
+</html> 
