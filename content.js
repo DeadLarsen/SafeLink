@@ -158,7 +158,7 @@ class SafeLinkContent {
 
     // Добавляем иконку предупреждения
     const warningIcon = document.createElement('span');
-    warningIcon.innerHTML = '⚠️';
+    warningIcon.innerHTML = '⛔️';
     warningIcon.style.cssText = `
       margin-left: 4px;
       font-size: 12px;
@@ -171,7 +171,7 @@ class SafeLinkContent {
     }
 
     // Добавляем тултип с информацией
-    linkElement.title = `⚠️ SafeLink: Потенциально опасная ссылка (${checkResult.reason})`;
+    linkElement.title = `⛔️ SafeLink: Потенциально опасная ссылка (${checkResult.reason})`;
     //linkElement.title = `⚠️`;
     
     // Добавляем атрибут для идентификации
@@ -201,7 +201,7 @@ class SafeLinkContent {
       <div class="safelink-modal-overlay">
         <div class="safelink-modal-content">
           <div class="safelink-modal-header">
-            <span class="safelink-warning-icon">⚠️</span>
+            <span class="safelink-warning-icon">⛔️</span>
             <h3>Предупреждение SafeLink</h3>
           </div>
           <div class="safelink-modal-body">

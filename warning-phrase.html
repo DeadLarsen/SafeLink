@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeLink - Поисковая фраза заблокирована</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .warning-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .warning-header {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .warning-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .warning-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .warning-subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .warning-content {
+            padding: 30px;
+        }
+
+        .blocked-phrase {
+            background: #ffe6e6;
+            border: 2px solid #ff6b6b;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .blocked-phrase::before {
+            content: "🚫";
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            background: white;
+            padding: 0 10px;
+            font-size: 18px;
+        }
+
+        .phrase-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #d63031;
+            word-break: break-word;
+            margin-bottom: 10px;
+        }
+
+        .phrase-category {
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .search-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .search-engine {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .original-query {
+            font-family: monospace;
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            word-break: break-all;
+        }
+
+        .reason-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .reason-title {
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .reason-text {
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .countdown {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .stats-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .stats-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stats-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .phrase-debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 9999;
+        }
+
+        @media (max-width: 600px) {
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="phrase-debug" id="phraseDebug">
+        Phrase Debug Log:
+    </div>
+
+    <div class="warning-container">
+        <div class="warning-header">
+            <div class="warning-icon">🔍🚫</div>
+            <h1 class="warning-title">Поисковая фраза заблокирована</h1>
+            <p class="warning-subtitle">SafeLink обнаружил запрещенный контент в вашем поисковом запросе</p>
+        </div>
+
+        <div class="warning-content">
+            <div class="blocked-phrase">
+                <div class="phrase-text" id="blockedPhrase">
+                    Загрузка заблокированной фразы...
+                </div>
+                <span class="phrase-category" id="phraseCategory">общая</span>
+            </div>
+
+            <div class="search-info">
+                <div class="search-engine" id="searchEngine">
+                    🔍 Поисковая система: <span id="engineName">Загрузка...</span>
+                </div>
+                <div class="original-query">
+                    <strong>Ваш запрос:</strong> <span id="originalQuery">Загрузка...</span>
+                </div>
+            </div>
+
+            <div class="reason-box">
+                <div class="reason-title">⚠️ Почему этот запрос заблокирован?</div>
+                <div class="reason-text" id="reasonText">
+                    Данная фраза содержится в федеральном списке запрещенных материалов. 
+                    Поиск подобного контента может быть ограничен в соответствии с российским законодательством.
+                </div>
+            </div>
+
+            <div class="stats-box">
+                <div class="stats-number" id="blockedCount">0</div>
+                <div class="stats-label">заблокированных поисковых запросов</div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" id="goBackBtn">
+                    ← Вернуться назад
+                </button>
+                
+                <button class="btn btn-secondary" id="modifySearchBtn">
+                    ✏️ Изменить запрос
+                </button>
+                
+                <button class="btn btn-danger" id="continueBtn">
+                    Продолжить поиск (<span class="countdown" id="countdown">10</span>)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="warning-phrase.js"></script>
+</body>
+</html> 

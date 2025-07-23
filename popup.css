@@ -253,4 +253,56 @@ body {
 
 .footer-link:hover {
     text-decoration: underline;
+}
+
+/* Стили для секции донатов */
+.donate-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 16px 0;
+    color: white;
+    text-align: center;
+}
+
+.donate-section h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.donate-text {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.donate-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-donate {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    flex: 1;
+}
+
+.btn-donate:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.btn-donate:active {
+    transform: translateY(0);
 } 

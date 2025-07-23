@@ -51,11 +51,21 @@
         "warning-debug.html",
         "warning-extension.html",
         "warning-extension.js",
+        "warning-phrase.html",
+        "warning-phrase.js",
+        "blocked-phrases.json",
+        "test-phrases.html",
+        "test-phrases.js",
         "simple-test.html",
         "debug.html", 
         "debug.js",
         "URGENT_RELOAD_GUIDE.md",
-        "CSP_ERROR_FIXED.md"
+        "CSP_ERROR_FIXED.md",
+        "PHRASE_BLOCKING_GUIDE.md",
+        "ENCODING_FIX_REPORT.md",
+        "REDIRECT_FIX_GUIDE.md",
+        "CRITICAL_REDIRECT_FIX.md",
+        "PRO_REMOVAL_DONATE_GUIDE.md"
       ],
       "matches": ["<all_urls>"]
     }

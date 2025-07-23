@@ -261,7 +261,48 @@ class SafeLinkPopup {
   }
 }
 
-// Инициализируем popup когда DOM загружен
+// Обработчики для кнопок донатов
 document.addEventListener('DOMContentLoaded', () => {
   new SafeLinkPopup();
+  
+  // Кнопка YooKassa
+  document.getElementById('donateYookassa').addEventListener('click', () => {
+    // TODO: Заменить на реальную ссылку YooKassa
+    const yookassaUrl = 'https://yookassa.ru/donate/safelink'; // Заглушка
+    chrome.tabs.create({ url: yookassaUrl });
+  });
+
+  // Кнопка Bitcoin
+  document.getElementById('donateBitcoin').addEventListener('click', () => {
+    // TODO: Заменить на реальный Bitcoin адрес
+    const bitcoinAddress = 'bc1qexamplebitcoinaddress123456789'; // Заглушка
+    
+    // Копируем адрес в буфер обмена
+    navigator.clipboard.writeText(bitcoinAddress).then(() => {
+      // Показываем уведомление
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #4CAF50;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      `;
+      notification.textContent = '₿ Bitcoin адрес скопирован!';
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 2000);
+    }).catch(() => {
+      // Fallback: показываем адрес в алерте
+      alert(`Bitcoin адрес:\n${bitcoinAddress}`);
+    });
+  });
 }); 
