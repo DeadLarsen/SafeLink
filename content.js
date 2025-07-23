@@ -150,8 +150,10 @@ class SafeLinkContent {
     linkElement.style.cssText += `
       border: 2px solid #f44336 !important;
       background: rgba(244, 67, 54, 0.1) !important;
-      border-radius: 3px !important;
-      position: relative !important;
+      border-radius: 6px !important;
+      #position: relative !important;
+      padding-top: 10px;
+      margin-right: -5px;
     `;
 
     // Добавляем иконку предупреждения
@@ -170,6 +172,7 @@ class SafeLinkContent {
 
     // Добавляем тултип с информацией
     linkElement.title = `⚠️ SafeLink: Потенциально опасная ссылка (${checkResult.reason})`;
+    //linkElement.title = `⚠️`;
     
     // Добавляем атрибут для идентификации
     linkElement.setAttribute('data-safelink-blocked', 'true');
