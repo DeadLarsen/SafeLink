@@ -27,12 +27,17 @@ class SafeLinkCore {
   async loadSettings() {
     const result = await chrome.storage.local.get(['safelink_settings']);
     if (result.safelink_settings) {
+      console.log('📥 Loading settings from storage:', result.safelink_settings);
       this.settings = { ...this.settings, ...result.safelink_settings };
+      console.log('⚙️ Settings loaded and merged:', this.settings);
+    } else {
+      console.log('⚙️ No saved settings found, using defaults:', this.settings);
     }
   }
 
   async saveSettings() {
     await chrome.storage.local.set({ safelink_settings: this.settings });
+    console.log('💾 Settings saved to storage:', this.settings);
   }
 
     // Нормализация URL для сравнения
@@ -309,7 +314,17 @@ class SafeLinkCore {
   }
 
   async checkUrl(url, tabId) {
-    if (this.settings.blockMode === 'disabled' && this.settings.phraseBlockMode === 'disabled') return;
+    console.log('🛡️ checkUrl called with settings:', {
+      blockMode: this.settings.blockMode,
+      phraseBlockMode: this.settings.phraseBlockMode,
+      url: url
+    });
+    console.log('🛡️ Full settings object:', this.settings);
+    
+    if (this.settings.blockMode === 'disabled' && this.settings.phraseBlockMode === 'disabled') {
+      console.log('🔴 ALL PROTECTION DISABLED - skipping all checks');
+      return;
+    }
 
     // Проверяем, не находится ли URL в списке игнорируемых (пользователь нажал "Продолжить")
     const isIgnored = await this.isUrlIgnored(url);
@@ -335,8 +350,10 @@ class SafeLinkCore {
     }
 
     // Проверка поисковых запросов на заблокированные фразы
+    console.log('📝 Checking phrases with phraseBlockMode:', this.settings.phraseBlockMode);
     if (this.settings.phraseBlockMode !== 'disabled') {
       const phraseCheck = this.checkSearchQuery(url);
+      console.log('📝 Phrase check result:', phraseCheck);
       
       if (phraseCheck.blocked) {
         if (this.settings.phraseBlockMode === 'block') {
@@ -634,6 +651,94 @@ class SafeLinkCore {
     return 'general';
   }
 }
+
+// Обработчик сообщений от popup и content scripts
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+  console.log('📨 Background получил сообщение:', request);
+
+  try {
+    switch (request.action) {
+      case 'getSettings':
+        sendResponse(safeLinkCore.settings);
+        break;
+
+      case 'updateSettings':
+        console.log('📨 Background: updateSettings received:', request);
+        if (request.settings) {
+          // Обновляем настройки
+          console.log('📨 Updating settings from:', safeLinkCore.settings);
+          console.log('📨 To new settings:', request.settings);
+          Object.assign(safeLinkCore.settings, request.settings);
+          await safeLinkCore.saveSettings();
+          console.log('⚙️ Настройки обновлены и сохранены:', safeLinkCore.settings);
+          sendResponse({ success: true });
+        } else {
+          console.log('❌ No settings provided in request');
+          sendResponse({ success: false, error: 'No settings provided' });
+        }
+        break;
+
+      case 'allowSite':
+        if (request.url) {
+          const domain = new URL(request.url).hostname;
+          safeLinkCore.allowedSites.add(domain);
+          await safeLinkCore.saveAllowedSites();
+          console.log('✅ Сайт добавлен в исключения:', domain);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'No URL provided' });
+        }
+        break;
+
+      case 'openUrl':
+        if (request.url) {
+          // Добавляем URL в список игнорируемых
+          const normalizedUrl = safeLinkCore.normalizeUrl(request.url);
+          safeLinkCore.ignoredSearchUrls.add(normalizedUrl);
+          await safeLinkCore.saveIgnoredUrls();
+          
+          console.log('🔗 Background: Opening URL:', request.url);
+          
+          // Не создаем новую вкладку, только подтверждаем
+          sendResponse({ success: true, tabCreated: false });
+        } else {
+          sendResponse({ success: false, error: 'No URL provided' });
+        }
+        break;
+
+      case 'checkUrl':
+        if (request.url) {
+          console.log('🔍 Content script checking URL:', request.url);
+          const result = safeLinkCore.isUrlBlocked(request.url);
+          console.log('🔍 URL check result:', result);
+          sendResponse(result);
+        } else {
+          sendResponse({ blocked: false, error: 'No URL provided' });
+        }
+        break;
+
+      case 'checkPhrase':
+        if (request.phrase) {
+          console.log('📝 Content script checking phrase:', request.phrase);
+          const result = safeLinkCore.isPhraseBlocked(request.phrase);
+          console.log('📝 Phrase check result:', result);
+          sendResponse(result);
+        } else {
+          sendResponse({ blocked: false, error: 'No phrase provided' });
+        }
+        break;
+
+      default:
+        console.warn('⚠️ Неизвестное действие:', request.action);
+        sendResponse({ success: false, error: 'Unknown action' });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка обработки сообщения:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+
+  return true; // Указываем, что ответ будет асинхронным
+});
 
 // Инициализируем SafeLink
 const safeLinkCore = new SafeLinkCore(); 

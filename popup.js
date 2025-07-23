@@ -70,13 +70,13 @@ class SafeLinkPopup {
 
     if (this.settings.blockMode === 'disabled') {
       protectionStatus.classList.add('disabled');
-      protectionStatus.querySelector('span').textContent = 'Защита отключена';
+      protectionStatus.querySelector('span').textContent = '🔴 Вся защита отключена';
       protectionStatus.querySelector('.status-indicator').classList.add('disabled');
       toggleBtn.classList.add('danger');
       toggleText.textContent = 'Включить защиту';
     } else {
       protectionStatus.classList.remove('disabled');
-      protectionStatus.querySelector('span').textContent = 'Защита активна';
+      protectionStatus.querySelector('span').textContent = '🛡️ Защита активна (сайты + фразы)';
       protectionStatus.querySelector('.status-indicator').classList.remove('disabled');
       toggleBtn.classList.remove('danger');
       toggleText.textContent = 'Отключить защиту';
@@ -89,11 +89,7 @@ class SafeLinkPopup {
     // Проверяем текущий сайт
     await this.checkCurrentSite();
 
-    // Показываем PRO секцию если включена
-    if (this.settings.proVersion) {
-      document.getElementById('proSection').style.display = 'block';
-      this.updateProSection();
-    }
+    // PRO секция удалена
   }
 
   async checkCurrentSite() {
@@ -145,19 +141,44 @@ class SafeLinkPopup {
   }
 
   async toggleProtection() {
-    const newMode = this.settings.blockMode === 'disabled' ? 'warn' : 'disabled';
+    console.log('🔄 toggleProtection clicked - current settings:', this.settings);
     
-    await chrome.runtime.sendMessage({
-      action: 'updateSettings',
-      settings: { blockMode: newMode }
-    });
-
-    this.settings.blockMode = newMode;
-    this.updateUI();
+    const isCurrentlyDisabled = this.settings.blockMode === 'disabled';
+    const newMode = isCurrentlyDisabled ? 'warn' : 'disabled';
+    
+    // Обновляем ОБА режима защиты: сайты И фразы
+    const newSettings = {
+      blockMode: newMode,
+      phraseBlockMode: newMode
+    };
+    
+    console.log('📤 Popup sending updateSettings message:', newSettings);
+    
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'updateSettings',
+        settings: newSettings
+      });
+      
+      console.log('📥 Popup received response:', response);
+      
+      if (response && response.success) {
+        this.settings.blockMode = newMode;
+        this.settings.phraseBlockMode = newMode;
+        this.updateUI();
+        console.log('✅ Popup: Settings updated successfully');
+      } else {
+        console.error('❌ Popup: Failed to update settings:', response);
+      }
+    } catch (error) {
+      console.error('❌ Popup: Error sending updateSettings:', error);
+    }
 
     // Показываем уведомление
     this.showNotification(
-      newMode === 'disabled' ? 'Защита отключена' : 'Защита включена',
+      newMode === 'disabled' 
+        ? '🔴 Вся защита отключена (сайты + фразы)' 
+        : '🟢 Вся защита включена (сайты + фразы)',
       newMode === 'disabled' ? 'warning' : 'success'
     );
   }
