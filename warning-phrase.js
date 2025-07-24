@@ -35,7 +35,6 @@ class PhraseWarningPage {
             this.updateInterface();
             this.loadStats();
             this.setupEventListeners();
-            this.startCountdown();
             this.debugLog('✅ Phrase warning initialized successfully');
         } catch (error) {
             this.debugLog(`❌ Init error: ${error.message}`);
@@ -271,6 +270,7 @@ class PhraseWarningPage {
         // Кнопка "Продолжить"
         const continueBtn = document.getElementById('continueBtn');
         if (continueBtn) {
+            continueBtn.disabled = false; // Кнопка активна сразу
             continueBtn.addEventListener('click', (e) => {
                 this.debugLog('👆 Continue button clicked');
                 e.preventDefault();
@@ -287,33 +287,6 @@ class PhraseWarningPage {
             }
         });
         this.debugLog('⌨️ Keyboard shortcuts set up');
-    }
-
-    // Обратный отсчет
-    startCountdown() {
-        this.debugLog('⏰ Starting countdown...');
-        const countdownElement = document.getElementById('countdown');
-        const continueBtn = document.getElementById('continueBtn');
-        
-        if (!countdownElement || !continueBtn) {
-            this.debugLog('❌ Countdown elements not found');
-            return;
-        }
-        
-        continueBtn.disabled = true;
-        this.debugLog(`⏰ Countdown: ${this.countdown} seconds`);
-        
-        this.countdownInterval = setInterval(() => {
-            this.countdown--;
-            countdownElement.textContent = this.countdown;
-            
-            if (this.countdown <= 0) {
-                clearInterval(this.countdownInterval);
-                continueBtn.disabled = false;
-                continueBtn.innerHTML = 'Продолжить поиск';
-                this.debugLog('✅ Countdown finished, button enabled');
-            }
-        }, 1000);
     }
 
     // Возврат назад
