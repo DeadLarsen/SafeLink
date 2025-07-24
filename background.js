@@ -615,11 +615,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       case 'allowSite':
         if (request.url) {
-          const domain = new URL(request.url).hostname;
-          safeLinkCore.allowedSites.add(domain);
-          await safeLinkCore.saveSettings(); // Changed from saveAllowedSites to saveSettings
-          console.log('✅ Сайт добавлен в исключения:', domain);
-          sendResponse({ success: true });
+          try {
+            const domain = new URL(request.url).hostname;
+            
+            // Добавляем в разрешенные
+            safeLinkCore.allowedSites.add(domain);
+            
+            // Удаляем из заблокированных (если есть в пользовательском списке)
+            const result = await chrome.storage.local.get(['custom_blocked_sites', 'custom_allowed_sites']);
+            let customBlocked = result.custom_blocked_sites || [];
+            let customAllowed = result.custom_allowed_sites || [];
+            
+            // Удаляем домен из пользовательского списка заблокированных
+            const originalLength = customBlocked.length;
+            customBlocked = customBlocked.filter(site => site !== domain);
+            
+            // Добавляем в пользовательский список разрешенных (если еще нет)
+            if (!customAllowed.includes(domain)) {
+              customAllowed.push(domain);
+            }
+            
+            // Сохраняем обновленные списки
+            await chrome.storage.local.set({
+              custom_blocked_sites: customBlocked,
+              custom_allowed_sites: customAllowed
+            });
+            
+            // Обновляем Set в памяти
+            safeLinkCore.blockedSites.delete(domain);
+            
+            console.log(`✅ Сайт ${domain} перемещен из заблокированных в разрешенные`);
+            if (originalLength !== customBlocked.length) {
+              console.log(`📝 Удален из пользовательского списка заблокированных`);
+            }
+            
+            sendResponse({ success: true });
+          } catch (error) {
+            console.error('❌ Ошибка разрешения сайта:', error);
+            sendResponse({ success: false, error: error.message });
+          }
         } else {
           sendResponse({ success: false, error: 'No URL provided' });
         }

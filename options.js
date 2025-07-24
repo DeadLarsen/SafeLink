@@ -12,6 +12,7 @@ class SafeLinkOptions {
     await this.loadData();
     this.setupNavigation();
     this.setupEventListeners();
+    this.setupStorageListener();
     this.updateUI();
   }
 
@@ -186,6 +187,58 @@ class SafeLinkOptions {
     // Очистка статистики
     document.getElementById('clearStats').addEventListener('click', () => {
       this.clearStatistics();
+    });
+  }
+
+  setupStorageListener() {
+    // Слушаем изменения в chrome.storage.local
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'local') {
+        // Проверяем, изменились ли списки сайтов
+        if (changes.custom_blocked_sites || changes.custom_allowed_sites) {
+          console.log('📋 Options: Storage changed, updating site lists');
+          
+          // Обновляем локальные массивы
+          if (changes.custom_blocked_sites) {
+            this.blockedSites = changes.custom_blocked_sites.newValue || [];
+            console.log('📋 Updated blocked sites:', this.blockedSites);
+          }
+          
+          if (changes.custom_allowed_sites) {
+            this.allowedSites = changes.custom_allowed_sites.newValue || [];
+            console.log('📋 Updated allowed sites:', this.allowedSites);
+          }
+          
+          // Обновляем UI
+          this.updateSiteLists();
+          
+          // Показываем уведомление о том, что списки обновились
+          if (changes.custom_blocked_sites && changes.custom_allowed_sites) {
+            // Оба списка изменились - найдем что было добавлено в разрешенные
+            const oldAllowed = changes.custom_allowed_sites.oldValue || [];
+            const newAllowed = changes.custom_allowed_sites.newValue || [];
+            const addedSites = newAllowed.filter(site => !oldAllowed.includes(site));
+            
+            if (addedSites.length > 0) {
+              this.showNotification(`Сайт ${addedSites[0]} разрешен и удален из заблокированных`, 'success');
+            } else {
+              this.showNotification('Списки сайтов обновлены', 'info');
+            }
+          } else if (changes.custom_allowed_sites) {
+            const oldValue = changes.custom_allowed_sites.oldValue || [];
+            const newValue = changes.custom_allowed_sites.newValue || [];
+            const addedSites = newValue.filter(site => !oldValue.includes(site));
+            
+            if (addedSites.length > 0) {
+              this.showNotification(`Сайт ${addedSites[0]} добавлен в разрешенные`, 'success');
+            } else {
+              this.showNotification('Список разрешенных сайтов обновлен', 'info');
+            }
+          } else if (changes.custom_blocked_sites) {
+            this.showNotification('Список заблокированных сайтов обновлен', 'info');
+          }
+        }
+      }
     });
   }
 
