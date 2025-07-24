@@ -49,17 +49,8 @@
                                 <input type="radio" name="blockMode" value="warn" checked>
                                 <span class="radio-custom"></span>
                                 <div class="radio-label">
-                                    <strong>Предупреждение</strong>
-                                    <p>Показывать предупреждение перед переходом</p>
-                                </div>
-                            </label>
-                            
-                            <label class="radio-option">
-                                <input type="radio" name="blockMode" value="block">
-                                <span class="radio-custom"></span>
-                                <div class="radio-label">
-                                    <strong>Блокировка</strong>
-                                    <p>Полностью блокировать опасные сайты</p>
+                                    <strong>Включена</strong>
+                                    <p>Показывать предупреждение перед переходом на опасные сайты</p>
                                 </div>
                             </label>
                         </div>
@@ -87,14 +78,6 @@
                             </div>
                         </label>
 
-                        <label class="toggle-option">
-                            <input type="checkbox" id="collectStats">
-                            <span class="toggle"></span>
-                            <div class="toggle-label">
-                                <strong>Собирать статистику</strong>
-                                <p>Ведение статистики заблокированных и разрешенных сайтов</p>
-                            </div>
-                        </label>
                     </div>
                 </div>
             </div>
@@ -133,6 +116,74 @@
                             </ul>
                         </div>
                     </div>
+                </div>
+
+                <div class="section">
+                    <h2>🔤 Запрещенные фразы (Минюст РФ)</h2>
+                    <div class="phrases-info" id="phrasesInfo">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Загружено фраз:</span>
+                                <span class="info-value" id="phrasesCount">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Последнее обновление:</span>
+                                <span class="info-value" id="lastUpdate">Никогда</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Возраст данных:</span>
+                                <span class="info-value" id="dataAge">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- <div class="setting-group">
+                        <label class="toggle-option">
+                            <input type="checkbox" id="autoUpdatePhrases">
+                            <span class="toggle"></span>
+                            <div class="toggle-label">
+                                <strong>Автообновление с minjust.gov.ru</strong>
+                                <p>Ежедневная загрузка актуального списка запрещенных материалов из федерального реестра</p>
+                            </div>
+                        </label>
+                    </div> -->
+                    
+                    <div class="button-group">
+                        <!-- <button class="btn btn-primary" id="updatePhrases">🔄 Обновить сейчас</button> -->
+                        <button class="btn btn-secondary" id="clearPhrasesCache" style="display: none;">🗑️ Очистить кэш</button>
+                        <button class="btn btn-secondary" id="togglePhrasesList">📋 Показать фразы</button>
+                        <!-- <button class="btn btn-secondary" id="testEncoding">🧪 Тест кодировки</button> -->
+                    </div>
+                    
+                    <div class="phrases-list-container" id="phrasesListContainer" style="display: none;">
+                        <div class="phrases-list-header">
+                            <h4>📝 Загруженные фразы</h4>
+                            <div class="phrases-controls">
+                                <input type="text" id="phrasesSearch" placeholder="Поиск по фразам..." class="phrases-search">
+                                <select id="phrasesSortBy" class="phrases-sort">
+                                    <option value="alphabetical">По алфавиту</option>
+                                    <option value="length">По длине</option>
+                                    <option value="recent">Последние</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="phrases-stats">
+                            <span class="phrases-stat">Показано: <strong id="phrasesShown">0</strong></span>
+                            <span class="phrases-stat">Всего: <strong id="phrasesTotal">0</strong></span>
+                        </div>
+                        <div class="phrases-list" id="phrasesList">
+                            <div class="phrases-loading">Загрузка фраз...</div>
+                        </div>
+                        <div class="phrases-pagination">
+                            <button class="btn btn-sm" id="phrasesPrev" disabled>← Предыдущие</button>
+                            <span class="pagination-info">Страница <span id="currentPage">1</span> из <span id="totalPages">1</span></span>
+                            <button class="btn btn-sm" id="phrasesNext" disabled>Следующие →</button>
+                        </div>
+                    </div>
+                    
+                    <!--div class="phrases-note">
+                        <p><strong>Примечание:</strong> Данные загружаются с официального сайта Министерства юстиции РФ (minjust.gov.ru) в соответствии с требованиями законодательства. Запросы ограничены до одного раза в 5 секунд для снижения нагрузки на сервер.</p>
+                    </div-->
                 </div>
 
                 <div class="section">

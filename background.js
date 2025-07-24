@@ -11,11 +11,17 @@ class SafeLinkCore {
       'bing.com', 'mail.ru', 'rambler.ru', 'yahoo.com', 'duckduckgo.com'
     ]);
     this.settings = {
-      blockMode: 'warn', // 'block', 'warn', 'disabled'
-      phraseBlockMode: 'warn', // 'block', 'warn', 'disabled'
+      blockMode: 'warn', // 'warn', 'disabled'
+      phraseBlockMode: 'warn', // 'warn', 'disabled'
       phraseSensitivity: 'medium', // 'strict', 'medium', 'loose'
-      markLinks: true // выделять опасные ссылки
+      markLinks: true, // выделять опасные ссылки
+      autoUpdatePhrases: false, // автообновление фраз с Минюста (отключено)
+      lastPhraseUpdate: 0 // timestamp последнего обновления
     };
+    
+    // Ограничение частоты запросов к API Минюста (5 секунд)
+    this.minJustRequestDelay = 5000;
+    this.lastMinJustRequest = 0;
     this.init();
   }
 
@@ -213,10 +219,31 @@ class SafeLinkCore {
 
   async loadBlockedPhrases() {
     try {
-      const response = await fetch(chrome.runtime.getURL('blocked-phrases.json'));
-      const phrasesData = await response.json();
+      // Сначала загружаем локальные фразы как fallback
+      let phrasesData = {};
+      try {
+        const response = await fetch(chrome.runtime.getURL('blocked-phrases.json'));
+        phrasesData = await response.json();
+        console.log('📁 SafeLink: Локальные фразы загружены как fallback');
+      } catch (error) {
+        console.warn('⚠️ SafeLink: Не удалось загрузить локальные фразы:', error);
+      }
       
-      this.blockedPhrases = new Set(phrasesData.all_phrases || []);
+      // Пытаемся загрузить обновленные фразы с Минюста
+      if (this.settings.autoUpdatePhrases) {
+        const updatedPhrases = await this.loadPhrasesFromMinJust();
+        if (updatedPhrases && updatedPhrases.size > 0) {
+          console.log('🌐 SafeLink: Используем обновленные фразы с Минюста');
+          this.blockedPhrases = updatedPhrases;
+        } else {
+          console.log('📁 SafeLink: Используем локальные фразы');
+          this.blockedPhrases = new Set(phrasesData.all_phrases || []);
+        }
+      } else {
+        console.log('📁 SafeLink: Автообновление отключено, используем локальные фразы');
+        this.blockedPhrases = new Set(phrasesData.all_phrases || []);
+      }
+      
       this.phraseCategories = phrasesData.categories || {};
       
       // Обновляем список поисковых систем
@@ -271,11 +298,7 @@ class SafeLinkCore {
     const urlCheck = this.isUrlBlocked(url);
     
     if (urlCheck.blocked && !urlCheck.allowed) {
-      if (this.settings.blockMode === 'block') {
-        chrome.tabs.update(tabId, {
-          url: chrome.runtime.getURL('warning-extension.html') + '?url=' + encodeURIComponent(url)
-        });
-      } else if (this.settings.blockMode === 'warn') {
+      if (this.settings.blockMode !== 'disabled') {
         chrome.tabs.update(tabId, {
           url: chrome.runtime.getURL('warning-extension.html') + '?url=' + encodeURIComponent(url)
         });
@@ -290,15 +313,10 @@ class SafeLinkCore {
       console.log('📝 Phrase check result:', phraseCheck);
       
       if (phraseCheck.blocked) {
-        if (this.settings.phraseBlockMode === 'block') {
-          chrome.tabs.update(tabId, {
-            url: chrome.runtime.getURL('warning-phrase.html') + '?phrase=' + encodeURIComponent(phraseCheck.phrase) + '&search=' + encodeURIComponent(url)
-          });
-        } else if (this.settings.phraseBlockMode === 'warn') {
-          chrome.tabs.update(tabId, {
-            url: chrome.runtime.getURL('warning-phrase.html') + '?phrase=' + encodeURIComponent(phraseCheck.phrase) + '&search=' + encodeURIComponent(url)
-          });
-        }
+        chrome.tabs.update(tabId, {
+          url: chrome.runtime.getURL('warning-phrase.html') + '?phrase=' + encodeURIComponent(phraseCheck.phrase) + '&search=' + encodeURIComponent(url)
+        });
+        return;
       }
     }
   }
@@ -584,6 +602,442 @@ class SafeLinkCore {
     }
     return 'general';
   }
+
+  async loadPhrasesFromMinJust() {
+    try {
+      // Проверяем ограничение частоты запросов (не чаще чем раз в 5 секунд)
+      const now = Date.now();
+      if (now - this.lastMinJustRequest < this.minJustRequestDelay) {
+        console.log(`⏰ SafeLink: Пропускаем запрос к Минюсту (осталось ${Math.ceil((this.minJustRequestDelay - (now - this.lastMinJustRequest)) / 1000)}с)`);
+        return this.getCachedPhrases();
+      }
+      
+      // Проверяем кэш (обновляем не чаще раза в день)
+      const cacheKey = 'safelink_minjust_phrases';
+      const cacheTimestampKey = 'safelink_minjust_timestamp';
+      const cached = await chrome.storage.local.get([cacheKey, cacheTimestampKey]);
+      
+      const cacheAge = now - (cached[cacheTimestampKey] || 0);
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      
+      if (cached[cacheKey] && cacheAge < oneDayMs) {
+        console.log(`💾 SafeLink: Используем кэшированные фразы (возраст: ${Math.round(cacheAge / (60 * 60 * 1000))}ч)`);
+        return new Set(cached[cacheKey]);
+      }
+      
+      console.log('🌐 SafeLink: Загружаем свежие фразы с minjust.gov.ru...');
+      this.lastMinJustRequest = now;
+      
+      // Загружаем CSV с сайта Минюста
+      const response = await fetch('https://minjust.gov.ru/uploaded/files/exportfsm.csv', {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'SafeLink Browser Extension',
+          'Accept': 'text/csv,text/plain,*/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Получаем данные как ArrayBuffer для правильной обработки кодировки
+      const arrayBuffer = await response.arrayBuffer();
+      console.log(`📋 SafeLink: Получен CSV размером ${Math.round(arrayBuffer.byteLength / 1024)}KB`);
+      
+      // Декодируем Windows-1251 (CP1251) в UTF-8
+      const csvText = this.decodeWindows1251(arrayBuffer);
+      console.log(`🔤 SafeLink: Декодирован текст в UTF-8, первые 200 символов: "${csvText.substring(0, 200)}..."`);
+      
+             // Парсим CSV и извлекаем фразы
+       const newPhrases = await this.parseMinJustCSV(csvText);
+       
+       if (newPhrases.size > 0) {
+         // Объединяем с существующими фразами, избегая дубликатов
+         const existingPhrases = cached[cacheKey] || [];
+         const existingSet = new Set(existingPhrases);
+         
+         let addedCount = 0;
+         newPhrases.forEach(phrase => {
+           if (!existingSet.has(phrase)) {
+             existingSet.add(phrase);
+             addedCount++;
+           }
+         });
+         
+         const finalPhrases = Array.from(existingSet);
+         
+         // Сохраняем в кэш
+         await chrome.storage.local.set({
+           [cacheKey]: finalPhrases,
+           [cacheTimestampKey]: now
+         });
+         
+         // Обновляем timestamp последнего обновления
+         this.settings.lastPhraseUpdate = now;
+         await this.saveSettings();
+         
+                 console.log(`✅ SafeLink: Обработано ${newPhrases.size} новых фраз, добавлено ${addedCount} уникальных, итого в базе ${finalPhrases.length}`);
+        return new Set(finalPhrases);
+       } else {
+         throw new Error('Не удалось извлечь фразы из CSV');
+       }
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка загрузки фраз с Минюста:', error);
+      return this.getCachedPhrases();
+    }
+  }
+
+  async getCachedPhrases() {
+    try {
+      const cached = await chrome.storage.local.get(['safelink_minjust_phrases']);
+      if (cached.safelink_minjust_phrases) {
+        console.log('💾 SafeLink: Используем кэшированные фразы после ошибки');
+        return new Set(cached.safelink_minjust_phrases);
+      }
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка загрузки кэшированных фраз:', error);
+    }
+    return null;
+  }
+
+  async parseMinJustCSV(csvText) {
+    try {
+      console.log('🔍 SafeLink: Начинаем парсинг CSV Минюста...');
+      const phrases = new Set();
+      
+      // Нормализуем переносы строк и разбиваем на строки
+      const normalizedText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const lines = normalizedText.split('\n');
+      console.log(`📋 SafeLink: Всего строк в CSV: ${lines.length}`);
+      
+      // Находим все записи, начинающиеся с номера
+      const records = [];
+      let currentRecord = '';
+      let recordId = null;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Проверяем, начинается ли строка с номера записи
+        const recordMatch = line.match(/^(\d+);"(.*)$/);
+        
+        if (recordMatch) {
+          // Сохраняем предыдущую запись, если она была
+          if (currentRecord && recordId) {
+            records.push({ id: recordId, content: currentRecord });
+          }
+          
+          // Начинаем новую запись
+          recordId = recordMatch[1];
+          currentRecord = recordMatch[2];
+        } else {
+          // Это продолжение текущей записи
+          if (currentRecord) {
+            currentRecord += ' ' + line;
+          }
+        }
+      }
+      
+      // Добавляем последнюю запись
+      if (currentRecord && recordId) {
+        records.push({ id: recordId, content: currentRecord });
+      }
+      
+      console.log(`📋 SafeLink: Найдено записей: ${records.length}`);
+      
+      let processed = 0;
+      let extracted = 0;
+      let validRecords = 0;
+      
+      for (const record of records) {
+        processed++;
+        
+        if (processed % 1000 === 0) {
+          console.log(`🔄 SafeLink: Обработано ${processed}/${records.length} записей, валидных: ${validRecords}, извлечено фраз: ${extracted}`);
+        }
+        
+        try {
+          let material = record.content;
+          
+          // Убираем завершающую кавычку и точку с запятой
+          material = material.replace(/";?\s*$/, '');
+          
+          if (material && material.length > 0) {
+            validRecords++;
+            
+            // Извлекаем ключевые фразы из описания материала
+            const materialPhrases = this.extractKeyPhrases(material);
+            
+            materialPhrases.forEach(phrase => {
+              if (phrase.length >= 3 && phrase.length <= 150) {
+                phrases.add(phrase);
+                extracted++;
+              }
+            });
+            
+            // Также добавляем очищенное полное название
+            const cleanMaterial = material
+              .replace(/,?\s*решение\s+вынесено.*$/i, '') // Убираем часть с решением суда
+              .replace(/,?\s*источник\s+публикации.*$/i, '') // Убираем источник публикации  
+              .replace(/,?\s*автор\s*-.*$/i, '') // Убираем информацию об авторе
+              .replace(/,?\s*автор.*$/i, '') // Убираем автора (альтернативный формат)
+              .trim();
+            
+            if (cleanMaterial.length >= 5 && cleanMaterial.length <= 150) {
+              phrases.add(cleanMaterial.toLowerCase());
+              extracted++;
+            }
+            
+            // Логируем первые несколько записей для отладки
+            if (processed <= 5) {
+              console.log(`📝 Запись ${record.id}: "${material.substring(0, 100)}..."`);
+            }
+          }
+        } catch (recordError) {
+          console.warn(`⚠️ SafeLink: Ошибка обработки записи ${record.id}:`, recordError.message);
+        }
+      }
+      
+      console.log(`✅ SafeLink: Парсинг завершен!`);
+      console.log(`📊 Обработано записей: ${processed}`);
+      console.log(`📊 Валидных записей: ${validRecords}`);
+      console.log(`📊 Извлечено фраз: ${extracted}`);
+      console.log(`📊 Уникальных фраз: ${phrases.size}`);
+      
+      return phrases;
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка парсинга CSV:', error);
+      return new Set();
+    }
+  }
+
+  parseCSVLine(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+    
+    while (i < line.length) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        fields.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+      i++;
+    }
+    
+    fields.push(current); // Добавляем последнее поле
+    return fields;
+  }
+
+  extractKeyPhrases(text) {
+    if (!text || typeof text !== 'string') return [];
+    
+    const phrases = [];
+    
+    // Сначала попробуем извлечь названия в кавычках (приоритет)
+    const quotedMatches = text.match(/"([^"]+)"/g);
+    if (quotedMatches) {
+      quotedMatches.forEach(match => {
+        const title = match.replace(/"/g, '').trim();
+        if (title.length >= 3 && title.length <= 200 && !this.isStopWord(title)) {
+          phrases.push(title.toLowerCase());
+          
+          // Также добавляем отдельные значимые слова из названия
+          const titleWords = title.toLowerCase().split(/\s+/);
+          titleWords.forEach(word => {
+            if (word.length >= 3 && !this.isStopWord(word) && !this.isNumber(word)) {
+              phrases.push(word);
+            }
+          });
+        }
+      });
+    }
+    
+    // Извлекаем названия между «»
+    const russianQuotedMatches = text.match(/«([^»]+)»/g);
+    if (russianQuotedMatches) {
+      russianQuotedMatches.forEach(match => {
+        const title = match.replace(/[«»]/g, '').trim();
+        if (title.length >= 3 && title.length <= 200 && !this.isStopWord(title)) {
+          phrases.push(title.toLowerCase());
+          
+          // Также добавляем отдельные значимые слова
+          const titleWords = title.toLowerCase().split(/\s+/);
+          titleWords.forEach(word => {
+            if (word.length >= 3 && !this.isStopWord(word) && !this.isNumber(word)) {
+              phrases.push(word);
+            }
+          });
+        }
+      });
+    }
+    
+    // Очищаем текст от HTML тегов и лишних символов
+    const cleanText = text
+      .replace(/<[^>]*>/g, ' ')  // Удаляем HTML теги
+      .replace(/&[a-zA-Z]+;/g, ' ')  // Удаляем HTML entities
+      .replace(/[^\u0400-\u04FF\u0500-\u052F\w\s\-«»""№:.()]/g, ' ')  // Оставляем больше символов
+      .replace(/\s+/g, ' ')  // Объединяем множественные пробелы
+      .trim()
+      .toLowerCase();
+    
+    if (!cleanText) return phrases;
+    
+    // Разбиваем на слова
+    const words = cleanText.split(/\s+/);
+    
+    // Извлекаем фразы длиной 1-8 слов (увеличил для полных названий)
+    for (let length = 1; length <= Math.min(8, words.length); length++) {
+      for (let start = 0; start <= words.length - length; start++) {
+        const phrase = words.slice(start, start + length).join(' ').trim();
+        
+        // Фильтруем слишком короткие или слишком длинные фразы
+        if (phrase.length >= 3 && phrase.length <= 150) {
+          // Исключаем служебные слова и номера
+          if (!this.isStopWord(phrase) && !this.isNumber(phrase)) {
+            phrases.push(phrase);
+          }
+        }
+      }
+    }
+    
+    // Извлекаем типы материалов с их названиями
+    const materialTypePatterns = [
+      /брошюра\s+"([^"]+)"/gi,
+      /книга\s+"([^"]+)"/gi,
+      /кинофильм\s+"([^"]+)"/gi,
+      /альбом\s+"([^"]+)"/gi,
+      /газета\s+"([^"]+)"/gi,
+      /журнал\s+"([^"]+)"/gi,
+      /статья\s+"([^"]+)"/gi,
+      /материал\s+"([^"]+)"/gi,
+      /песня\s+"([^"]+)"/gi,
+      /фильм\s+"([^"]+)"/gi,
+      /видео\s+"([^"]+)"/gi,
+      /аудио\s+"([^"]+)"/gi,
+      /текст\s+"([^"]+)"/gi
+    ];
+    
+    materialTypePatterns.forEach(pattern => {
+      const matches = text.match(pattern);
+      if (matches) {
+        matches.forEach(match => {
+          const titleMatch = match.match(/"([^"]+)"/);
+          if (titleMatch) {
+            const title = titleMatch[1].trim().toLowerCase();
+            if (title.length >= 3 && title.length <= 150 && !this.isStopWord(title)) {
+              phrases.push(title);
+            }
+          }
+        });
+      }
+    });
+    
+    return [...new Set(phrases)]; // Убираем дубликаты
+  }
+
+  isStopWord(phrase) {
+    const stopWords = [
+      // Основные предлоги и союзы
+      'и', 'в', 'на', 'с', 'по', 'для', 'от', 'до', 'при', 'за', 'под', 'над', 'о', 'об', 'к', 'у',
+      'из', 'без', 'через', 'между', 'среди', 'около', 'возле', 'против', 'вместо', 'кроме',
+      'или', 'но', 'а', 'да', 'же', 'ли', 'бы', 'ни', 'не', 'то', 'так', 'уже', 'еще', 'тоже',
+      // Местоимения
+      'что', 'как', 'где', 'когда', 'почему', 'который', 'которая', 'которое', 'которые',
+      'это', 'тот', 'та', 'то', 'те', 'свой', 'своя', 'свое', 'свои', 'мой', 'моя', 'мое', 'мои',
+      'его', 'её', 'их', 'наш', 'наша', 'наше', 'наши', 'ваш', 'ваша', 'ваше', 'ваши',
+      // Юридические термины (часто встречающиеся в документах)
+      'номер', 'пункт', 'статья', 'часть', 'раздел', 'глава', 'абзац', 'подпункт', 'п', 'ст',
+      'российской', 'федерации', 'рф', 'кодекс', 'закон', 'указ', 'постановление', 'решение',
+      // Английские стоп-слова
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+      // Очень короткие слова (1-2 символа)
+      'до', 'на', 'по', 'за', 'из', 'от', 'об', 'со', 'во', 'ко'
+    ];
+    
+    const lowerPhrase = phrase.toLowerCase().trim();
+    
+    // Проверяем точное совпадение
+    if (stopWords.includes(lowerPhrase)) {
+      return true;
+    }
+    
+    // Исключаем очень короткие фразы (менее 3 символов)
+    if (lowerPhrase.length < 3) {
+      return true;
+    }
+    
+    // Исключаем фразы состоящие только из цифр и специальных символов
+    if (/^[\d\s\-№«»"".,;:!?()]+$/.test(lowerPhrase)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  isNumber(phrase) {
+    return /^\d+$/.test(phrase) || /^\d+[\.,]\d+$/.test(phrase);
+  }
+
+  decodeWindows1251(arrayBuffer) {
+    try {
+      // Таблица соответствия Windows-1251 (CP1251) символов
+      // Позиции 128-255 содержат кириллицу и специальные символы
+      const cp1251Table = [
+        0x0402, 0x0403, 0x201A, 0x0453, 0x201E, 0x2026, 0x2020, 0x2021, // 128-135
+        0x20AC, 0x2030, 0x0409, 0x2039, 0x040A, 0x040C, 0x040B, 0x040F, // 136-143
+        0x0452, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, // 144-151
+        0x0098, 0x2122, 0x0459, 0x203A, 0x045A, 0x045C, 0x045B, 0x045F, // 152-159
+        0x00A0, 0x040E, 0x045E, 0x0408, 0x00A4, 0x0490, 0x00A6, 0x00A7, // 160-167
+        0x0401, 0x00A9, 0x0404, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x0407, // 168-175
+        0x00B0, 0x00B1, 0x0406, 0x0456, 0x0491, 0x00B5, 0x00B6, 0x00B7, // 176-183
+        0x0451, 0x2116, 0x0454, 0x00BB, 0x0458, 0x0405, 0x0455, 0x0457, // 184-191
+        0x0410, 0x0411, 0x0412, 0x0413, 0x0414, 0x0415, 0x0416, 0x0417, // 192-199 (А-З)
+        0x0418, 0x0419, 0x041A, 0x041B, 0x041C, 0x041D, 0x041E, 0x041F, // 200-207 (И-П)
+        0x0420, 0x0421, 0x0422, 0x0423, 0x0424, 0x0425, 0x0426, 0x0427, // 208-215 (Р-Ч)
+        0x0428, 0x0429, 0x042A, 0x042B, 0x042C, 0x042D, 0x042E, 0x042F, // 216-223 (Ш-Я)
+        0x0430, 0x0431, 0x0432, 0x0433, 0x0434, 0x0435, 0x0436, 0x0437, // 224-231 (а-з)
+        0x0438, 0x0439, 0x043A, 0x043B, 0x043C, 0x043D, 0x043E, 0x043F, // 232-239 (и-п)
+        0x0440, 0x0441, 0x0442, 0x0443, 0x0444, 0x0445, 0x0446, 0x0447, // 240-247 (р-ч)
+        0x0448, 0x0449, 0x044A, 0x044B, 0x044C, 0x044D, 0x044E, 0x044F  // 248-255 (ш-я)
+      ];
+      
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let result = '';
+      
+      for (let i = 0; i < uint8Array.length; i++) {
+        const byte = uint8Array[i];
+        
+        if (byte < 128) {
+          // ASCII символы (0-127) остаются без изменений
+          result += String.fromCharCode(byte);
+        } else {
+          // Символы 128-255 декодируем по таблице CP1251
+          const unicodeCodePoint = cp1251Table[byte - 128];
+          result += String.fromCharCode(unicodeCodePoint);
+        }
+      }
+      
+      console.log(`🔤 SafeLink: Декодировано ${uint8Array.length} байт из CP1251 в UTF-8`);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка декодирования CP1251:', error);
+      // Fallback - пытаемся декодировать как UTF-8
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      return decoder.decode(arrayBuffer);
+    }
+  }
 }
 
 // Обработчик сообщений от popup и content scripts
@@ -694,6 +1148,140 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse(result);
         } else {
           sendResponse({ blocked: false, error: 'No phrase provided' });
+        }
+        break;
+
+      case 'updatePhrasesFromMinJust':
+        console.log('🔄 Manual phrases update requested');
+        try {
+          // Сбрасываем timestamp последнего запроса для принудительного обновления
+          safeLinkCore.lastMinJustRequest = 0;
+          const phrases = await safeLinkCore.loadPhrasesFromMinJust();
+          if (phrases && phrases.size > 0) {
+            safeLinkCore.blockedPhrases = phrases;
+            sendResponse({ 
+              success: true, 
+              count: phrases.size,
+              message: `Обновление завершено! Загружено ${phrases.size} фраз из федерального списка Минюста РФ.`
+            });
+          } else {
+            sendResponse({ success: false, error: 'Не удалось загрузить фразы' });
+          }
+        } catch (error) {
+          console.error('❌ Manual phrases update failed:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'getPhrasesInfo':
+        try {
+          const cached = await chrome.storage.local.get(['safelink_minjust_timestamp']);
+          const lastUpdate = cached.safelink_minjust_timestamp || 0;
+          const age = lastUpdate > 0 ? Date.now() - lastUpdate : 0;
+          
+          sendResponse({
+            success: true,
+            phrasesCount: safeLinkCore.blockedPhrases.size,
+            lastUpdate: lastUpdate,
+            ageHours: Math.round(age / (60 * 60 * 1000)),
+            autoUpdate: safeLinkCore.settings.autoUpdatePhrases
+          });
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'testCP1251Decoding':
+        try {
+          // Тестируем декодирование на локальном файле (если доступен)
+          console.log('🧪 Testing CP1251 decoding...');
+          const testResponse = await fetch('https://minjust.gov.ru/uploaded/files/exportfsm.csv');
+          if (testResponse.ok) {
+            const arrayBuffer = await testResponse.arrayBuffer();
+            const decoded = safeLinkCore.decodeWindows1251(arrayBuffer);
+            
+            // Ищем тестовую фразу
+            const testPhrase = 'Церберы свободы';
+            const found = decoded.toLowerCase().includes(testPhrase.toLowerCase());
+            
+            const sample = decoded.substring(0, 500);
+            sendResponse({
+              success: true,
+              testPhrase: testPhrase,
+              found: found,
+              sample: sample,
+              sizeKB: Math.round(arrayBuffer.byteLength / 1024)
+            });
+          } else {
+            sendResponse({ success: false, error: `HTTP ${testResponse.status}` });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'getPhrasesList':
+        try {
+          const phrasesArray = Array.from(safeLinkCore.blockedPhrases);
+          const page = request.page || 1;
+          const limit = request.limit || 50;
+          const searchTerm = request.search || '';
+          const sortBy = request.sortBy || 'alphabetical';
+          
+          // Фильтрация по поисковому запросу
+          let filteredPhrases = phrasesArray;
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredPhrases = phrasesArray.filter(phrase => 
+              phrase.toLowerCase().includes(searchLower)
+            );
+          }
+          
+          // Сортировка
+          switch (sortBy) {
+            case 'alphabetical':
+              filteredPhrases.sort((a, b) => a.localeCompare(b, 'ru'));
+              break;
+            case 'length':
+              filteredPhrases.sort((a, b) => a.length - b.length);
+              break;
+            case 'recent':
+              // Для "recent" оставляем порядок как есть (последние добавленные)
+              break;
+          }
+          
+          // Пагинация
+          const startIndex = (page - 1) * limit;
+          const endIndex = startIndex + limit;
+          const paginatedPhrases = filteredPhrases.slice(startIndex, endIndex);
+          
+          // Добавляем метаданные к фразам
+          const phrasesWithMeta = paginatedPhrases.map(phrase => ({
+            text: phrase,
+            length: phrase.length,
+            words: phrase.split(' ').length,
+            type: phrase.split(' ').length === 1 ? 'слово' : 'фраза'
+          }));
+          
+          sendResponse({
+            success: true,
+            phrases: phrasesWithMeta,
+            pagination: {
+              page: page,
+              limit: limit,
+              total: filteredPhrases.length,
+              totalPages: Math.ceil(filteredPhrases.length / limit),
+              hasNext: endIndex < filteredPhrases.length,
+              hasPrev: page > 1
+            },
+            filter: {
+              search: searchTerm,
+              sortBy: sortBy
+            }
+          });
+        } catch (error) {
+          console.error('Error getting phrases list:', error);
+          sendResponse({ success: false, error: error.message });
         }
         break;
 

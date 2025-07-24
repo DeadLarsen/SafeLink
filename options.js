@@ -26,7 +26,8 @@ class SafeLinkOptions {
         markLinks: true,
         showNotifications: true,
         collectStats: true,
-        autoSync: true
+        autoSync: true,
+        autoUpdatePhrases: false
       };
 
       // Загружаем списки сайтов
@@ -72,6 +73,9 @@ class SafeLinkOptions {
     // Управление списками
     this.setupListManagement();
     
+    // Управление фразами
+    this.setupPhrasesManagement();
+    
     // PRO функции
     this.setupProFeatures();
     
@@ -99,7 +103,6 @@ class SafeLinkOptions {
       { id: 'collectStats', setting: 'collectStats' },
       { id: 'autoSync', setting: 'autoSync' }
     ];
-
     toggles.forEach(({ id, setting }) => {
       const toggle = document.getElementById(id);
       if (toggle) {
@@ -190,6 +193,192 @@ class SafeLinkOptions {
     });
   }
 
+  setupPhrasesManagement() {
+    // Состояние для списка фраз
+    this.phrasesListVisible = false;
+    this.currentPage = 1;
+    this.phrasesPerPage = 50;
+    this.currentSearch = '';
+    this.currentSort = 'alphabetical';
+    
+    // Переключение видимости списка фраз
+    document.getElementById('togglePhrasesList').addEventListener('click', () => {
+      this.togglePhrasesList();
+    });
+    
+    // Поиск фраз
+    document.getElementById('phrasesSearch').addEventListener('input', (e) => {
+      this.currentSearch = e.target.value;
+      this.currentPage = 1;
+      this.debounceSearch();
+    });
+    
+    // Сортировка фраз
+    document.getElementById('phrasesSortBy').addEventListener('change', (e) => {
+      this.currentSort = e.target.value;
+      this.currentPage = 1;
+      this.loadPhrasesList();
+    });
+    
+    // Пагинация
+    document.getElementById('phrasesPrev').addEventListener('click', () => {
+      if (this.currentPage > 1) {
+        this.currentPage--;
+        this.loadPhrasesList();
+      }
+    });
+    
+    document.getElementById('phrasesNext').addEventListener('click', () => {
+      this.currentPage++;
+      this.loadPhrasesList();
+    });
+    
+    // Debounce для поиска
+    this.searchTimeout = null;
+    
+    // Обновить фразы сейчас
+    /*
+    document.getElementById('updatePhrases').addEventListener('click', async () => {
+      const button = document.getElementById('updatePhrases');
+      const originalText = button.textContent;
+      
+      try {
+        button.textContent = '🔄 Обновление...';
+        button.disabled = true;
+        
+        const response = await chrome.runtime.sendMessage({
+          action: 'updatePhrasesFromMinJust'
+        });
+        
+        if (response && response.success) {
+          this.showNotification(`✅ Загружено ${response.count} фраз`, 'success');
+          await this.updatePhrasesInfo();
+          
+          // Обновляем список фраз, если он открыт
+          if (this.phrasesListVisible) {
+            this.currentPage = 1; // Сбрасываем на первую страницу
+            this.loadPhrasesList();
+          }
+        } else {
+          this.showNotification(`❌ Ошибка: ${response?.error || 'Неизвестная ошибка'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка обновления фраз:', error);
+        this.showNotification('❌ Ошибка обновления фраз', 'error');
+      } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    });
+    */
+    
+    // Очистить кэш фраз
+    document.getElementById('clearPhrasesCache').addEventListener('click', async () => {
+      if (confirm('Вы уверены, что хотите очистить кэш фраз? Это приведет к повторной загрузке данных при следующем обновлении.')) {
+        try {
+          await chrome.storage.local.remove(['safelink_minjust_phrases', 'safelink_minjust_timestamp']);
+          this.showNotification('🗑️ Кэш фраз очищен', 'success');
+          await this.updatePhrasesInfo();
+        } catch (error) {
+          console.error('Ошибка очистки кэша:', error);
+          this.showNotification('❌ Ошибка очистки кэша', 'error');
+        }
+      }
+    });
+    
+    // Тест кодировки
+    /*
+    document.getElementById('testEncoding').addEventListener('click', async () => {
+      const button = document.getElementById('testEncoding');
+      const originalText = button.textContent;
+      
+      try {
+        button.textContent = '🧪 Тестирование...';
+        button.disabled = true;
+        
+        const response = await chrome.runtime.sendMessage({
+          action: 'testCP1251Decoding'
+        });
+        
+        if (response && response.success) {
+          const message = `✅ Тест кодировки прошел успешно!\n\n` +
+            `📊 Размер файла: ${response.sizeKB} KB\n` +
+            `🔍 Искали фразу: "${response.testPhrase}"\n` +
+            `${response.found ? '✅' : '❌'} Найдено: ${response.found ? 'Да' : 'Нет'}\n\n` +
+            `📝 Образец декодированного текста:\n"${response.sample}"`;
+          
+          alert(message);
+          
+          if (response.found) {
+            this.showNotification('🎉 Кодировка работает! Фраза найдена.', 'success');
+          } else {
+            this.showNotification('⚠️ Тестовая фраза не найдена', 'warning');
+          }
+        } else {
+          this.showNotification(`❌ Ошибка теста: ${response?.error}`, 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка теста кодировки:', error);
+        this.showNotification('❌ Ошибка теста кодировки', 'error');
+      } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    });
+    */
+    
+    // Загружаем информацию о фразах при инициализации
+    this.updatePhrasesInfo();
+  }
+
+  async updatePhrasesInfo() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getPhrasesInfo'
+      });
+      
+      if (response && response.success) {
+        // Обновляем количество фраз
+        document.getElementById('phrasesCount').textContent = response.phrasesCount || 0;
+        
+        // Обновляем дату последнего обновления
+        const lastUpdateElement = document.getElementById('lastUpdate');
+        const dataAgeElement = document.getElementById('dataAge');
+        
+        if (response.lastUpdate && response.lastUpdate > 0) {
+          const lastUpdateDate = new Date(response.lastUpdate);
+          lastUpdateElement.textContent = lastUpdateDate.toLocaleString('ru-RU');
+          
+          if (response.ageHours !== undefined) {
+            if (response.ageHours < 1) {
+              dataAgeElement.textContent = 'Менее часа';
+            } else if (response.ageHours < 24) {
+              dataAgeElement.textContent = `${response.ageHours} ч`;
+            } else {
+              const days = Math.floor(response.ageHours / 24);
+              dataAgeElement.textContent = `${days} дн`;
+            }
+          } else {
+            dataAgeElement.textContent = '-';
+          }
+        } else {
+          lastUpdateElement.textContent = 'Никогда';
+          dataAgeElement.textContent = '-';
+        }
+        
+        // Обновляем состояние автообновления
+        const autoUpdateToggle = document.getElementById('autoUpdatePhrases');
+        if (autoUpdateToggle) {
+          autoUpdateToggle.checked = response.autoUpdate || false;
+        }
+      } else {
+        console.error('Ошибка получения информации о фразах:', response);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки информации о фразах:', error);
+    }
+  }
+
   setupStorageListener() {
     // Слушаем изменения в chrome.storage.local
     chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -264,11 +453,16 @@ class SafeLinkOptions {
     }
 
     // Переключатели
-    const toggles = ['markLinks', 'showNotifications', 'collectStats', 'autoSync'];
+    const toggles = [
+      { id: 'markLinks', setting: 'markLinks' },
+      { id: 'showNotifications', setting: 'showNotifications' },
+      { id: 'collectStats', setting: 'collectStats' },
+      { id: 'autoSync', setting: 'autoSync' }
+    ];
     toggles.forEach(toggle => {
-      const element = document.getElementById(toggle);
+      const element = document.getElementById(toggle.id);
       if (element) {
-        element.checked = this.settings[toggle] || false;
+        element.checked = this.settings[toggle.setting] || false;
       }
     });
   }
@@ -633,6 +827,106 @@ class SafeLinkOptions {
         notification.remove();
       }, 300);
     }, 3000);
+  }
+
+  togglePhrasesList() {
+    const container = document.getElementById('phrasesListContainer');
+    const button = document.getElementById('togglePhrasesList');
+    
+    this.phrasesListVisible = !this.phrasesListVisible;
+    
+    if (this.phrasesListVisible) {
+      container.style.display = 'block';
+      button.textContent = '📋 Скрыть фразы';
+      this.loadPhrasesList();
+    } else {
+      container.style.display = 'none';
+      button.textContent = '📋 Показать фразы';
+    }
+  }
+
+  debounceSearch() {
+    clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+      this.loadPhrasesList();
+    }, 300);
+  }
+
+  async loadPhrasesList() {
+    const phrasesList = document.getElementById('phrasesList');
+    const phrasesShown = document.getElementById('phrasesShown');
+    const phrasesTotal = document.getElementById('phrasesTotal');
+    const currentPageEl = document.getElementById('currentPage');
+    const totalPagesEl = document.getElementById('totalPages');
+    const prevBtn = document.getElementById('phrasesPrev');
+    const nextBtn = document.getElementById('phrasesNext');
+    
+    try {
+      // Показываем индикатор загрузки
+      phrasesList.innerHTML = '<div class="phrases-loading">Загрузка фраз...</div>';
+      
+      const response = await chrome.runtime.sendMessage({
+        action: 'getPhrasesList',
+        page: this.currentPage,
+        limit: this.phrasesPerPage,
+        search: this.currentSearch,
+        sortBy: this.currentSort
+      });
+      
+      if (response && response.success) {
+        this.renderPhrasesList(response.phrases);
+        
+        // Обновляем статистику
+        phrasesShown.textContent = response.phrases.length;
+        phrasesTotal.textContent = response.pagination.total;
+        
+        // Обновляем пагинацию
+        currentPageEl.textContent = response.pagination.page;
+        totalPagesEl.textContent = response.pagination.totalPages;
+        
+        prevBtn.disabled = !response.pagination.hasPrev;
+        nextBtn.disabled = !response.pagination.hasNext;
+        
+        // Если страница выходит за границы, возвращаемся к первой
+        if (response.pagination.page > response.pagination.totalPages && response.pagination.totalPages > 0) {
+          this.currentPage = 1;
+          this.loadPhrasesList();
+          return;
+        }
+      } else {
+        phrasesList.innerHTML = `<div class="phrases-loading">Ошибка загрузки: ${response?.error || 'Неизвестная ошибка'}</div>`;
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки списка фраз:', error);
+      phrasesList.innerHTML = '<div class="phrases-loading">Ошибка загрузки фраз</div>';
+    }
+  }
+
+  renderPhrasesList(phrases) {
+    const phrasesList = document.getElementById('phrasesList');
+    
+    if (phrases.length === 0) {
+      phrasesList.innerHTML = '<div class="phrases-loading">Фразы не найдены</div>';
+      return;
+    }
+    
+    const phrasesHtml = phrases.map(phrase => `
+      <div class="phrase-item">
+        <div class="phrase-text">${this.escapeHtml(phrase.text)}</div>
+        <div class="phrase-meta">
+          <span class="phrase-length">${phrase.length}</span>
+          <span class="phrase-type">${phrase.type}</span>
+        </div>
+      </div>
+    `).join('');
+    
+    phrasesList.innerHTML = phrasesHtml;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 
