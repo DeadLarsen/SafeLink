@@ -1067,6 +1067,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
 
+        case 'reloadSiteLists':
+          console.log('🔄 Background: reloadSiteLists received');
+          try {
+            await safeLinkCore.loadBlockedSites();
+            console.log(`✅ Списки перезагружены: ${safeLinkCore.blockedSites.size} заблокированных, ${safeLinkCore.allowedSites.size} разрешенных`);
+            sendResponse({ 
+              success: true, 
+              blockedCount: safeLinkCore.blockedSites.size,
+              allowedCount: safeLinkCore.allowedSites.size
+            });
+          } catch (error) {
+            console.error('❌ Background: reloadSiteLists failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+
       case 'allowSite':
         if (request.url) {
           try {
@@ -1299,4 +1315,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Инициализируем SafeLink
-const safeLinkCore = new SafeLinkCore(); 
+const safeLinkCore = new SafeLinkCore();
+
+// Слушаем изменения в chrome.storage для автоматической перезагрузки списков
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local') {
+    // Если изменились списки сайтов - перезагружаем их
+    if (changes.custom_blocked_sites || changes.custom_allowed_sites) {
+      console.log('🔄 Background: Обнаружены изменения в списках сайтов, перезагружаем...');
+      safeLinkCore.loadBlockedSites().then(() => {
+        console.log(`✅ Background: Списки автоматически перезагружены: ${safeLinkCore.blockedSites.size} заблокированных, ${safeLinkCore.allowedSites.size} разрешенных`);
+      }).catch(error => {
+        console.error('❌ Background: Ошибка автоматической перезагрузки списков:', error);
+      });
+    }
+    
+    // Если изменились настройки - обновляем их
+    if (changes.safelink_settings) {
+      console.log('⚙️ Background: Обнаружены изменения в настройках');
+      safeLinkCore.loadSettings().then(() => {
+        console.log('✅ Background: Настройки автоматически перезагружены');
+      }).catch(error => {
+        console.error('❌ Background: Ошибка перезагрузки настроек:', error);
+      });
+    }
+  }
+}); 

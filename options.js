@@ -25,7 +25,6 @@ class SafeLinkOptions {
         proVersion: false,
         markLinks: true,
         showNotifications: true,
-        collectStats: true,
         autoSync: true,
         autoUpdatePhrases: false
       };
@@ -100,7 +99,6 @@ class SafeLinkOptions {
     const toggles = [
       { id: 'markLinks', setting: 'markLinks' },
       { id: 'showNotifications', setting: 'showNotifications' },
-      { id: 'collectStats', setting: 'collectStats' },
       { id: 'autoSync', setting: 'autoSync' }
     ];
     toggles.forEach(({ id, setting }) => {
@@ -456,7 +454,6 @@ class SafeLinkOptions {
     const toggles = [
       { id: 'markLinks', setting: 'markLinks' },
       { id: 'showNotifications', setting: 'showNotifications' },
-      { id: 'collectStats', setting: 'collectStats' },
       { id: 'autoSync', setting: 'autoSync' }
     ];
     toggles.forEach(toggle => {
@@ -798,6 +795,16 @@ class SafeLinkOptions {
       custom_blocked_sites: this.blockedSites,
       custom_allowed_sites: this.allowedSites
     });
+    
+    // Уведомляем background script об изменении списков
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'reloadSiteLists'
+      });
+      console.log('🔄 Background script уведомлен об изменении списков:', response);
+    } catch (error) {
+      console.warn('⚠️ Не удалось уведомить background script:', error);
+    }
   }
 
   showNotification(message, type = 'info') {
