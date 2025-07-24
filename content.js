@@ -5,10 +5,13 @@ class SafeLinkContent {
     this.extensionReady = false;
     this.retryCount = 0;
     this.maxRetries = 3;
+    this.settings = { markLinks: true }; // Настройки по умолчанию
+    this.observerInitialized = false; // Флаг для DOM observer
+    this.clickInterceptorInitialized = false; // Флаг для click interceptor
     this.init();
   }
 
-  init() {
+  async init() {
     // Проверяем доступность Chrome API
     if (!this.isExtensionAvailable()) {
       this.retryCount++;
@@ -27,6 +30,18 @@ class SafeLinkContent {
     this.extensionReady = true;
     this.retryCount = 0;
 
+    // Сначала загружаем настройки
+    await this.loadSettings();
+
+    // Устанавливаем слушатель сообщений от background-скрипта
+    this.setupMessageListener();
+
+    // Если маркировка ссылок отключена, не делаем ничего
+    if (!this.settings.markLinks) {
+      console.log('SafeLink: Маркировка ссылок отключена в настройках.');
+      return;
+    }
+
     // Проверяем все ссылки на странице при загрузке
     this.checkAllLinks();
     
@@ -39,11 +54,68 @@ class SafeLinkContent {
     console.log('SafeLink Content Script успешно инициализирован');
   }
 
+  setupMessageListener() {
+    // Слушаем сообщения от background-скрипта
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'settingsUpdated') {
+        console.log('SafeLink: Получены обновленные настройки:', request.settings);
+        this.handleSettingsUpdate(request.settings);
+        sendResponse({ success: true });
+      }
+    });
+  }
+
+  handleSettingsUpdate(newSettings) {
+    const oldMarkLinks = this.settings.markLinks;
+    this.settings = newSettings;
+    
+    // Если маркировка была включена, а теперь отключена
+    if (oldMarkLinks && !newSettings.markLinks) {
+      console.log('SafeLink: Маркировка ссылок отключена - снимаем подсветку');
+      this.removeAllLinkHighlights();
+    }
+    // Если маркировка была отключена, а теперь включена
+    else if (!oldMarkLinks && newSettings.markLinks) {
+      console.log('SafeLink: Маркировка ссылок включена - проверяем все ссылки');
+      this.checkAllLinks();
+      if (!this.observerInitialized) {
+        this.observeDOM();
+      }
+      if (!this.clickInterceptorInitialized) {
+        this.interceptClicks();
+      }
+    }
+  }
+
+  removeAllLinkHighlights() {
+    // Находим все помеченные ссылки и снимаем с них подсветку
+    const markedLinks = document.querySelectorAll('a[data-safelink-blocked="true"]');
+    console.log(`SafeLink: Снимаем подсветку с ${markedLinks.length} ссылок`);
+    
+    markedLinks.forEach(link => {
+      this.unmarkLink(link);
+    });
+  }
+
   isExtensionAvailable() {
     try {
       return !!(chrome && chrome.runtime && chrome.runtime.id);
     } catch (error) {
       return false;
+    }
+  }
+
+  async loadSettings() {
+    try {
+      if (this.isExtensionAvailable()) {
+        const response = await chrome.runtime.sendMessage({ action: 'getSettings' });
+        if (response) {
+          this.settings = response;
+          console.log('SafeLink: Настройки загружены в content script:', this.settings);
+        }
+      }
+    } catch (error) {
+      console.error('SafeLink: Ошибка загрузки настроек в content script:', error);
     }
   }
 
@@ -180,6 +252,8 @@ class SafeLinkContent {
   }
 
   interceptClicks() {
+    if (this.clickInterceptorInitialized) return;
+    
     document.addEventListener('click', (event) => {
       const target = event.target.closest('a[href]');
       
@@ -191,6 +265,8 @@ class SafeLinkContent {
         return false;
       }
     }, true);
+    
+    this.clickInterceptorInitialized = true;
   }
 
   showWarningModal(url, linkElement) {
@@ -396,6 +472,8 @@ class SafeLinkContent {
   }
 
   observeDOM() {
+    if (this.observerInitialized) return;
+    
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
@@ -421,6 +499,8 @@ class SafeLinkContent {
       childList: true,
       subtree: true
     });
+    
+    this.observerInitialized = true;
   }
 
   isExternalLink(url) {

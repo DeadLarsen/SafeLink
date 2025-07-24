@@ -3,17 +3,12 @@ class SafeLinkPopup {
   constructor() {
     this.currentTab = null;
     this.settings = {};
-    this.stats = {
-      blocked: 0,
-      allowed: 0
-    };
     this.init();
   }
 
   async init() {
     await this.getCurrentTab();
     await this.loadSettings();
-    await this.loadStats();
     this.setupEventListeners();
     this.updateUI();
   }
@@ -26,13 +21,6 @@ class SafeLinkPopup {
   async loadSettings() {
     const response = await chrome.runtime.sendMessage({ action: 'getSettings' });
     this.settings = response;
-  }
-
-  async loadStats() {
-    const result = await chrome.storage.local.get(['safelink_stats']);
-    if (result.safelink_stats) {
-      this.stats = result.safelink_stats;
-    }
   }
 
   setupEventListeners() {
@@ -81,10 +69,6 @@ class SafeLinkPopup {
       toggleBtn.classList.remove('danger');
       toggleText.textContent = 'Отключить защиту';
     }
-
-    // Обновляем статистику
-    document.getElementById('blockedCount').textContent = this.stats.blocked;
-    document.getElementById('allowedCount').textContent = this.stats.allowed;
 
     // Проверяем текущий сайт
     await this.checkCurrentSite();
@@ -149,29 +133,36 @@ class SafeLinkPopup {
     // Обновляем ОБА режима защиты: сайты И фразы
     const newSettings = {
       blockMode: newMode,
-      phraseBlockMode: newMode
+      phraseBlockMode: newMode,
+      markLinks: newMode !== 'disabled' // true если включена защита, false если выключена
     };
     
     console.log('📤 Popup sending updateSettings message:', newSettings);
     
     try {
+      console.log('📤 Popup: Sending message to background...');
       const response = await chrome.runtime.sendMessage({
         action: 'updateSettings',
         settings: newSettings
       });
       
       console.log('📥 Popup received response:', response);
+      console.log('📥 Response type:', typeof response);
+      console.log('📥 Response success:', response?.success);
       
       if (response && response.success) {
         this.settings.blockMode = newMode;
         this.settings.phraseBlockMode = newMode;
+        this.settings.markLinks = newMode !== 'disabled';
         this.updateUI();
         console.log('✅ Popup: Settings updated successfully');
       } else {
         console.error('❌ Popup: Failed to update settings:', response);
+        console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
       }
     } catch (error) {
       console.error('❌ Popup: Error sending updateSettings:', error);
+      console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
     }
 
     // Показываем уведомление
@@ -190,10 +181,6 @@ class SafeLinkPopup {
       action: 'allowSite',
       url: this.currentTab.url
     });
-
-    // Обновляем статистику
-    this.stats.allowed++;
-    await chrome.storage.local.set({ safelink_stats: this.stats });
 
     // Обновляем UI
     this.updateUI();

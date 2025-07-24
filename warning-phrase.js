@@ -355,15 +355,6 @@ class PhraseWarningPage {
     async continueSearch() {
         this.debugLog('🚀 Continuing original search...');
         
-        const proceed = confirm(
-            `Вы уверены что хотите продолжить поиск по фразе "${this.blockedPhrase}"?\n\nЭтот материал может быть запрещен законодательством РФ.`
-        );
-        
-        if (!proceed) {
-            this.debugLog('🚫 User cancelled search continuation');
-            return;
-        }
-        
         try {
             this.updateStats('ignored');
             

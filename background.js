@@ -13,7 +13,8 @@ class SafeLinkCore {
     this.settings = {
       blockMode: 'warn', // 'block', 'warn', 'disabled'
       phraseBlockMode: 'warn', // 'block', 'warn', 'disabled'
-      phraseSensitivity: 'medium' // 'strict', 'medium', 'loose'
+      phraseSensitivity: 'medium', // 'strict', 'medium', 'loose'
+      markLinks: true // выделять опасные ссылки
     };
     this.init();
   }
@@ -243,74 +244,7 @@ class SafeLinkCore {
       }
     });
 
-    // Обработка сообщений от content scripts
-    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-      switch (request.action) {
-        case 'checkUrl':
-          const result = this.isUrlBlocked(request.url);
-          sendResponse(result);
-          break;
-        case 'checkPhrase':
-          const phraseResult = this.isPhraseBlocked(request.phrase);
-          sendResponse(phraseResult);
-          break;
-        case 'allowSite':
-          this.allowSiteTemporarily(request.url);
-          sendResponse({ success: true });
-          break;
-        case 'getSettings':
-          sendResponse(this.settings);
-          break;
-        case 'updateSettings':
-          this.updateSettings(request.settings);
-          sendResponse({ success: true });
-          break;
-        case 'getPhraseStats':
-          this.getPhraseStats().then(stats => sendResponse(stats));
-          return true; // Для асинхронного ответа
-        case 'getSearchEngines':
-          sendResponse(Array.from(this.searchEngines));
-          break;
-        case 'openUrl':
-          // Обработка запроса на открытие URL (для warning-phrase.html)
-          console.log('🔗 Background: Opening URL:', request.url);
-          
-          try {
-            // Проверяем валидность URL
-            try {
-              new URL(request.url);
-            } catch (urlError) {
-              console.error('❌ Background: Invalid URL:', request.url);
-              sendResponse({ success: false, error: 'Invalid URL format' });
-              return true;
-            }
-            
-            // КРИТИЧЕСКИ ВАЖНО: Дожидаемся добавления в ignored list
-            console.log('⏳ Background: Adding URL to ignored list...');
-            await this.addToIgnoredUrls(request.url);
-            console.log('✅ Background: URL successfully added to ignored list');
-            
-            // Дополнительная задержка для синхронизации storage
-            await new Promise(resolve => setTimeout(resolve, 100));
-            console.log('⌛ Background: Storage sync delay completed');
-            
-            // НЕ создаем новую вкладку - позволяем warning вкладке перенаправить себя
-            console.log('🎯 Background: URL added to ignored list, allowing warning tab to redirect itself');
-            sendResponse({ success: true, redirect: true, message: 'URL added to ignored list, proceed with redirect' });
-          } catch (error) {
-            console.error('❌ Background: Exception in openUrl:', error);
-            sendResponse({ success: false, error: error.message });
-          }
-          
-          return true; // Indicates we will respond asynchronously
-          break;
-      }
-    });
-
-    // Обновление badge
-    chrome.tabs.onActivated.addListener((activeInfo) => {
-      this.updateBadge(activeInfo.tabId);
-    });
+    // Примечание: Обработчик сообщений перенесен в глобальную область после инициализации класса
   }
 
   async checkUrl(url, tabId) {
@@ -434,27 +368,27 @@ class SafeLinkCore {
   }
 
   // Обновление настроек
-  updateSettings(newSettings) {
+  async updateSettings(newSettings) {
     this.settings = { ...this.settings, ...newSettings };
-    chrome.storage.local.set({ safelink_settings: this.settings });
+    await chrome.storage.local.set({ safelink_settings: this.settings });
     console.log('SafeLink: Настройки обновлены:', this.settings);
-  }
-
-  // Обновление badge
-  async updateBadge(tabId) {
+    
+    // Уведомляем все content-скрипты об изменении настроек
     try {
-      const stats = await this.getPhraseStats();
-      const siteStats = await chrome.storage.local.get(['safelink_stats']);
-      const totalBlocked = (stats.blocked || 0) + (siteStats.safelink_stats?.blocked || 0);
-      
-      if (totalBlocked > 0) {
-        chrome.action.setBadgeText({ text: String(totalBlocked), tabId });
-        chrome.action.setBadgeBackgroundColor({ color: '#ff6b6b', tabId });
-      } else {
-        chrome.action.setBadgeText({ text: '', tabId });
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'settingsUpdated',
+            settings: this.settings
+          });
+        } catch (error) {
+          // Игнорируем ошибки для вкладок, где нет content-скрипта
+        }
       }
+      console.log('📢 Background: Настройки отправлены всем content-скриптам');
     } catch (error) {
-      console.error('SafeLink: Ошибка обновления badge:', error);
+      console.error('❌ Background: Ошибка уведомления content-скриптов:', error);
     }
   }
 
@@ -653,36 +587,37 @@ class SafeLinkCore {
 }
 
 // Обработчик сообщений от popup и content scripts
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('📨 Background получил сообщение:', request);
 
-  try {
-    switch (request.action) {
-      case 'getSettings':
-        sendResponse(safeLinkCore.settings);
-        break;
+  (async () => {
+    try {
+      switch (request.action) {
+        case 'getSettings':
+          sendResponse(safeLinkCore.settings);
+          break;
 
-      case 'updateSettings':
-        console.log('📨 Background: updateSettings received:', request);
-        if (request.settings) {
-          // Обновляем настройки
-          console.log('📨 Updating settings from:', safeLinkCore.settings);
-          console.log('📨 To new settings:', request.settings);
-          Object.assign(safeLinkCore.settings, request.settings);
-          await safeLinkCore.saveSettings();
-          console.log('⚙️ Настройки обновлены и сохранены:', safeLinkCore.settings);
-          sendResponse({ success: true });
-        } else {
-          console.log('❌ No settings provided in request');
-          sendResponse({ success: false, error: 'No settings provided' });
-        }
-        break;
+        case 'updateSettings':
+          console.log('📨 Background: updateSettings received:', request);
+          if (request.settings) {
+            try {
+              await safeLinkCore.updateSettings(request.settings);
+              sendResponse({ success: true });
+            } catch (error) {
+              console.error('❌ Background: updateSettings failed:', error);
+              sendResponse({ success: false, error: error.message });
+            }
+          } else {
+            console.log('❌ No settings provided in request');
+            sendResponse({ success: false, error: 'No settings provided' });
+          }
+          break;
 
       case 'allowSite':
         if (request.url) {
           const domain = new URL(request.url).hostname;
           safeLinkCore.allowedSites.add(domain);
-          await safeLinkCore.saveAllowedSites();
+          await safeLinkCore.saveSettings(); // Changed from saveAllowedSites to saveSettings
           console.log('✅ Сайт добавлен в исключения:', domain);
           sendResponse({ success: true });
         } else {
@@ -695,7 +630,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
           // Добавляем URL в список игнорируемых
           const normalizedUrl = safeLinkCore.normalizeUrl(request.url);
           safeLinkCore.ignoredSearchUrls.add(normalizedUrl);
-          await safeLinkCore.saveIgnoredUrls();
+          await safeLinkCore.saveSettings(); // Changed from saveIgnoredUrls to saveSettings
           
           console.log('🔗 Background: Opening URL:', request.url);
           
@@ -736,6 +671,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     console.error('❌ Ошибка обработки сообщения:', error);
     sendResponse({ success: false, error: error.message });
   }
+  })(); // Закрываем IIFE
 
   return true; // Указываем, что ответ будет асинхронным
 });
