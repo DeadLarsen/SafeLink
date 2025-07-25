@@ -975,20 +975,129 @@ class SafeLinkCore {
     }
   }
 
+  async updateLocalCSVFile() {
+    try {
+      console.log('🌐 SafeLink: Скачиваем свежий CSV с minjust.gov.ru...');
+      
+      // Скачиваем свежий CSV с сайта Минюста
+      const response = await fetch('https://minjust.gov.ru/uploaded/files/exportfsm.csv', {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'SafeLink Browser Extension',
+          'Accept': 'text/csv,text/plain,*/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Получаем данные как ArrayBuffer
+      const arrayBuffer = await response.arrayBuffer();
+      console.log(`📊 SafeLink: Скачан CSV размером ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
+      
+      // Конвертируем ArrayBuffer в base64 для сохранения (обрабатываем по частям для больших файлов)
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binaryString = '';
+      const chunkSize = 8192; // Обрабатываем по 8KB за раз
+      
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binaryString += String.fromCharCode.apply(null, chunk);
+      }
+      
+      const base64String = btoa(binaryString);
+      
+      // Сохраняем в chrome.storage.local с меткой времени
+      await chrome.storage.local.set({
+        'safelink_local_csv': base64String,
+        'safelink_csv_updated': Date.now()
+      });
+      
+      console.log('💾 SafeLink: Локальный CSV файл обновлен');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка обновления CSV файла:', error);
+      throw error;
+    }
+  }
+
+  async getLocalFileInfo() {
+    try {
+      // Получаем информацию об обновленном CSV из storage
+      const stored = await chrome.storage.local.get(['safelink_csv_updated']);
+      
+      // Информация о исходном файле расширения (статическая)
+      const originalFileDate = new Date('2024-07-22T14:38:00'); // Дата из ls -la exportfsm.csv
+      
+      if (stored.safelink_csv_updated) {
+        // Есть обновленный файл
+        const updateDate = new Date(stored.safelink_csv_updated);
+        return {
+          hasUpdatedFile: true,
+          isLocal: false,
+          lastUpdate: updateDate,
+          displayText: `📁 Загрузить из файла (обновлен: ${updateDate.toLocaleDateString('ru-RU')} ${updateDate.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})})`
+        };
+      } else {
+        // Только исходный файл
+        return {
+          hasUpdatedFile: false,
+          isLocal: true,
+          lastUpdate: originalFileDate,
+          displayText: `📁 Загрузить из файла (локальный от ${originalFileDate.toLocaleDateString('ru-RU')})`
+        };
+      }
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка получения информации о файле:', error);
+      return {
+        hasUpdatedFile: false,
+        isLocal: true,
+        lastUpdate: null,
+        displayText: '📁 Загрузить из файла (локальный)'
+      };
+    }
+  }
+
   async loadPhrasesFromLocalFile() {
     try {
       console.log('📁 SafeLink: Загружаем фразы из локального файла exportfsm.csv...');
       
-      // Загружаем локальный файл
-      const response = await fetch(chrome.runtime.getURL('exportfsm.csv'));
+      let arrayBuffer;
       
-      if (!response.ok) {
-        throw new Error(`Локальный файл не найден: ${response.status}`);
+      // Сначала пробуем загрузить обновленный CSV из storage
+      try {
+        const stored = await chrome.storage.local.get(['safelink_local_csv', 'safelink_csv_updated']);
+        if (stored.safelink_local_csv) {
+          console.log('💾 SafeLink: Используем обновленный CSV из storage');
+          // Конвертируем base64 обратно в ArrayBuffer
+          const binaryString = atob(stored.safelink_local_csv);
+          arrayBuffer = new ArrayBuffer(binaryString.length);
+          const uint8Array = new Uint8Array(arrayBuffer);
+          for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i);
+          }
+          const updateTime = new Date(stored.safelink_csv_updated).toLocaleString();
+          console.log(`📅 SafeLink: CSV обновлен: ${updateTime}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ SafeLink: Не удалось загрузить CSV из storage:', error);
       }
       
-      // Получаем как ArrayBuffer для обработки кодировки CP1251
-      const arrayBuffer = await response.arrayBuffer();
-      console.log(`📊 SafeLink: Загружен локальный CSV, размер: ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
+      // Если нет обновленного CSV, загружаем из файла расширения
+      if (!arrayBuffer) {
+        console.log('📁 SafeLink: Загружаем CSV из файла расширения');
+        const response = await fetch(chrome.runtime.getURL('exportfsm.csv'));
+        
+        if (!response.ok) {
+          throw new Error(`Локальный файл не найден: ${response.status}`);
+        }
+        
+        arrayBuffer = await response.arrayBuffer();
+      }
+      
+      console.log(`📊 SafeLink: Загружен CSV, размер: ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
       
       // Декодируем CP1251 в UTF-8 (используем существующую функцию)
       const csvText = this.decodeWindows1251(arrayBuffer);
@@ -1083,6 +1192,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
           
+        case 'getLocalFileInfo':
+          console.log('📋 Background: getLocalFileInfo received');
+          try {
+            const fileInfo = await safeLinkCore.getLocalFileInfo();
+            sendResponse({ 
+              success: true, 
+              fileInfo: fileInfo
+            });
+          } catch (error) {
+            console.error('❌ Background: getLocalFileInfo failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+
+        case 'updatePhrasesAndCSV':
+          console.log('🔄 Background: updatePhrasesAndCSV received');
+          try {
+            // Сначала обновляем локальный CSV файл
+            await safeLinkCore.updateLocalCSVFile();
+            
+            // Затем загружаем фразы из обновленного файла
+            const phrases = await safeLinkCore.loadPhrasesFromLocalFile();
+            
+            if (phrases && phrases.size > 0) {
+              safeLinkCore.blockedPhrases = phrases;
+              sendResponse({ 
+                success: true, 
+                count: phrases.size,
+                message: 'CSV файл и фразы успешно обновлены'
+              });
+            } else {
+              sendResponse({ success: false, error: 'Не удалось загрузить фразы после обновления CSV' });
+            }
+          } catch (error) {
+            console.error('❌ Background: updatePhrasesAndCSV failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+
         case 'loadPhrasesFromLocalFile':
           console.log('📁 Background: loadPhrasesFromLocalFile received');
           try {

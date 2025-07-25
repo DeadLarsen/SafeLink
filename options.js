@@ -11,7 +11,7 @@ class SafeLinkOptions {
   async init() {
     await this.loadData();
     this.setupNavigation();
-    this.setupEventListeners();
+    await this.setupEventListeners();
     this.setupStorageListener();
     this.updateUI();
   }
@@ -65,7 +65,7 @@ class SafeLinkOptions {
     });
   }
 
-  setupEventListeners() {
+  async setupEventListeners() {
     // Настройки защиты
     this.setupProtectionSettings();
     
@@ -234,13 +234,13 @@ class SafeLinkOptions {
     // Debounce для поиска
     this.searchTimeout = null;
     
-    // Обновление фраз с новым алгоритмом
+    // Обновление фраз и CSV файла
     document.getElementById('updatePhrasesNew').addEventListener('click', async () => {
       const button = document.getElementById('updatePhrasesNew');
       const originalText = button.textContent;
       
       try {
-        button.textContent = '🔄 Очистка и обновление...';
+        button.textContent = '🔄 Скачивание CSV...';
         button.disabled = true;
         
         // Сначала очищаем старые данные
@@ -250,16 +250,17 @@ class SafeLinkOptions {
         // Обновляем информацию (покажет 0 фраз)
         await this.updatePhrasesInfo();
         
-        button.textContent = '🔄 Загрузка новых фраз...';
+        button.textContent = '🔄 Обновление CSV и фраз...';
         
-        // Затем загружаем новые данные
+        // Обновляем CSV файл и загружаем новые фразы
         const response = await chrome.runtime.sendMessage({
-          action: 'updatePhrasesFromMinJust'
+          action: 'updatePhrasesAndCSV'
         });
         
         if (response && response.success) {
-          this.showNotification(`✅ Успешно! Загружено ${response.count} фраз (только в кавычках)`, 'success');
+          this.showNotification(`✅ Успешно! CSV обновлен, загружено ${response.count} фраз`, 'success');
           await this.updatePhrasesInfo();
+          await this.updateFileButtonText(); // Обновляем текст кнопки после обновления
           
           // Обновляем список фраз, если он открыт
           if (this.phrasesListVisible) {
@@ -270,8 +271,8 @@ class SafeLinkOptions {
           this.showNotification(`❌ Ошибка: ${response?.error || 'Неизвестная ошибка'}`, 'error');
         }
       } catch (error) {
-        console.error('Ошибка обновления фраз:', error);
-        this.showNotification('❌ Ошибка обновления фраз', 'error');
+        console.error('Ошибка обновления фраз и CSV:', error);
+        this.showNotification('❌ Ошибка обновления фраз и CSV', 'error');
       } finally {
         button.textContent = originalText;
         button.disabled = false;
@@ -398,6 +399,7 @@ class SafeLinkOptions {
         if (response && response.success) {
           this.showNotification(`✅ Загружено ${response.count} фраз из локального файла`, 'success');
           await this.updatePhrasesInfo();
+          await this.updateFileButtonText(); // Обновляем текст кнопки после загрузки
           
           // Обновляем список фраз, если он открыт
           if (this.phrasesListVisible) {
@@ -418,6 +420,7 @@ class SafeLinkOptions {
     
     // Загружаем информацию о фразах при инициализации
     this.updatePhrasesInfo();
+    this.updateFileButtonText(); // Обновляем текст кнопки файла
   }
 
   async updatePhrasesInfo() {
@@ -895,6 +898,31 @@ class SafeLinkOptions {
       console.log('🔄 Background script уведомлен об изменении списков:', response);
     } catch (error) {
       console.warn('⚠️ Не удалось уведомить background script:', error);
+    }
+  }
+
+  async updateFileButtonText() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getLocalFileInfo'
+      });
+      
+      if (response && response.success) {
+        const button = document.getElementById('initPhrasesFromFile');
+        if (button) {
+          button.textContent = response.fileInfo.displayText;
+          
+          // Добавляем класс для стилизации в зависимости от типа файла
+          button.classList.remove('btn-warning', 'btn-info');
+          if (response.fileInfo.hasUpdatedFile) {
+            button.classList.add('btn-info'); // Синий для обновленного
+          } else {
+            button.classList.add('btn-warning'); // Оранжевый для локального
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка обновления текста кнопки файла:', error);
     }
   }
 
