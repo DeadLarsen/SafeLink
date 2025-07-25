@@ -286,17 +286,44 @@ class SafeLinkCore {
       const urlObj = new URL(url);
       const domain = urlObj.hostname.toLowerCase();
       
-      // Проверяем allowed sites (приоритет)
+      // Формируем полный URL без протокола для проверки
+      let fullUrlPath = domain;
+      if (urlObj.pathname && urlObj.pathname !== '/') {
+        fullUrlPath += urlObj.pathname;
+      }
+      if (urlObj.search) {
+        fullUrlPath += urlObj.search;
+      }
+      fullUrlPath = fullUrlPath.toLowerCase();
+      
+      // ПРИОРИТЕТ 1: Проверяем allowed sites - сначала полный URL, потом домен
+      if (this.allowedSites.has(fullUrlPath)) {
+        return { blocked: false, allowed: true, reason: 'whitelisted_url' };
+      }
       if (this.allowedSites.has(domain)) {
-        return { blocked: false, allowed: true, reason: 'whitelisted' };
+        return { blocked: false, allowed: true, reason: 'whitelisted_domain' };
       }
 
-      // Проверяем точное совпадение домена
+      // ПРИОРИТЕТ 2: Проверяем blocked sites - сначала полный URL, потом домен  
+      if (this.blockedSites.has(fullUrlPath)) {
+        return { blocked: true, allowed: false, reason: 'exact_url_match', url: fullUrlPath };
+      }
+      
       if (this.blockedSites.has(domain)) {
-        return { blocked: true, allowed: false, reason: 'exact_match', domain };
+        return { blocked: true, allowed: false, reason: 'exact_domain_match', domain };
       }
 
-      // Проверяем поддомены
+      // ПРИОРИТЕТ 3: Проверяем частичное совпадение URL-ов в списке заблокированных
+      for (const blockedItem of this.blockedSites) {
+        if (blockedItem.includes('/')) { // Это полный URL, не домен
+          // Проверяем начинается ли наш URL с заблокированного URL
+          if (fullUrlPath.startsWith(blockedItem)) {
+            return { blocked: true, allowed: false, reason: 'url_prefix_match', url: blockedItem };
+          }
+        }
+      }
+
+      // ПРИОРИТЕТ 4: Проверяем поддомены (как раньше)
       const domainParts = domain.split('.');
       for (let i = 1; i < domainParts.length; i++) {
         const parentDomain = domainParts.slice(i).join('.');
@@ -926,16 +953,12 @@ class SafeLinkCore {
     
     const urls = [];
     
-    // Паттерны для поиска URL-ов
+    // Паттерны для поиска полных URL-ов
     const urlPatterns = [
-      // http:// и https://
+      // http:// и https:// с полным путем
       /https?:\/\/([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}([\/\w\.-]*)*\/?/g,
-      // www.domain.com (без протокола)
-      /www\.([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}([\/\w\.-]*)*\/?/g,
-      // Домены в кавычках
-      /"([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}"/g,
-      // Домены без кавычек (более строгий паттерн)
-      /\b([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b/g
+      // www.domain.com с полным путем
+      /www\.([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}([\/\w\.-]*)*\/?/g
     ];
     
     urlPatterns.forEach(pattern => {
@@ -946,24 +969,53 @@ class SafeLinkCore {
         // Очищаем URL от кавычек
         url = url.replace(/['"]/g, '');
         
-        // Убираем протокол для единообразия
+        // Убираем протокол для единообразия, но сохраняем путь
         url = url.replace(/^https?:\/\//, '');
         url = url.replace(/^www\./, '');
         
-        // Убираем путь, оставляем только домен
-        url = url.split('/')[0];
+        // Убираем завершающий слеш если это только домен
+        if (url.indexOf('/') === -1) {
+          url = url.replace(/\/$/, '');
+        }
         
         // Убираем точку в конце если есть
         url = url.replace(/\.$/, '');
         
-        // Проверяем что это валидный домен
-        if (this.isValidDomain(url)) {
+        // Проверяем что это валидный URL
+        if (this.isValidUrl(url)) {
           urls.push(url.toLowerCase());
         }
       }
     });
     
     return [...new Set(urls)]; // Убираем дубликаты
+  }
+
+  isValidUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    // Разделяем на домен и путь
+    const parts = url.split('/');
+    const domain = parts[0];
+    const path = parts.slice(1).join('/');
+    
+    // Проверяем домен
+    if (!this.isValidDomain(domain)) return false;
+    
+    // Проверяем путь (если есть)
+    if (path) {
+      // Путь должен содержать допустимые символы
+      const pathRegex = /^[a-zA-Z0-9\/\-._~:?#[\]@!$&'()*+,;=%]*$/;
+      if (!pathRegex.test(path)) return false;
+      
+      // Слишком длинный путь
+      if (path.length > 2000) return false;
+    }
+    
+    // Общая длина URL
+    if (url.length > 2083) return false;
+    
+    return true;
   }
 
   isValidDomain(domain) {
@@ -1255,7 +1307,7 @@ class SafeLinkCore {
     try {
       if (!blockedUrls || blockedUrls.size === 0) return;
       
-      console.log(`🌐 SafeLink: Добавляем ${blockedUrls.size} URL-ов в заблокированные сайты...`);
+      console.log(`🌐 SafeLink: Обрабатываем ${blockedUrls.size} URL-ов из CSV...`);
       
       // Загружаем текущие списки
       const result = await chrome.storage.local.get(['custom_blocked_sites', 'custom_allowed_sites']);
@@ -1263,13 +1315,18 @@ class SafeLinkCore {
       const currentAllowed = new Set(result.custom_allowed_sites || []);
       
       let addedCount = 0;
+      let skippedCount = 0;
+      const addedUrls = [];
       
       // Добавляем URL-ы которых еще нет в списках
       for (const url of blockedUrls) {
         // Не добавляем если URL уже в разрешенных или заблокированных
         if (!currentBlocked.has(url) && !currentAllowed.has(url)) {
           currentBlocked.add(url);
+          addedUrls.push(url);
           addedCount++;
+        } else {
+          skippedCount++;
         }
       }
       
@@ -1282,7 +1339,16 @@ class SafeLinkCore {
         // Обновляем локальные списки
         this.blockedSites = currentBlocked;
         
-        console.log(`✅ SafeLink: Добавлено ${addedCount} новых заблокированных сайтов из CSV`);
+        // Показываем несколько примеров добавленных URL-ов
+        const examples = addedUrls.slice(0, 3);
+        const hasMore = addedUrls.length > 3;
+        
+        console.log(`✅ SafeLink: Добавлено ${addedCount} новых заблокированных URL-ов из CSV`);
+        console.log(`📋 Примеры: ${examples.join(', ')}${hasMore ? '...' : ''}`);
+        
+        if (skippedCount > 0) {
+          console.log(`ℹ️ SafeLink: ${skippedCount} URL-ов уже присутствовали в списках`);
+        }
       } else {
         console.log(`ℹ️ SafeLink: Все URL-ы из CSV уже присутствуют в списках`);
       }
