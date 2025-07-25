@@ -768,32 +768,22 @@ class SafeLinkCore {
           if (material && material.length > 0) {
             validRecords++;
             
-            // Извлекаем ключевые фразы из описания материала
+            // Извлекаем только фразы в кавычках из описания материала
             const materialPhrases = this.extractKeyPhrases(material);
             
             materialPhrases.forEach(phrase => {
-              if (phrase.length >= 3 && phrase.length <= 150) {
+              if (phrase.length >= 3 && phrase.length <= 200) {
                 phrases.add(phrase);
                 extracted++;
               }
             });
             
-            // Также добавляем очищенное полное название
-            const cleanMaterial = material
-              .replace(/,?\s*решение\s+вынесено.*$/i, '') // Убираем часть с решением суда
-              .replace(/,?\s*источник\s+публикации.*$/i, '') // Убираем источник публикации  
-              .replace(/,?\s*автор\s*-.*$/i, '') // Убираем информацию об авторе
-              .replace(/,?\s*автор.*$/i, '') // Убираем автора (альтернативный формат)
-              .trim();
-            
-            if (cleanMaterial.length >= 5 && cleanMaterial.length <= 150) {
-              phrases.add(cleanMaterial.toLowerCase());
-              extracted++;
-            }
-            
             // Логируем первые несколько записей для отладки
             if (processed <= 5) {
-              console.log(`📝 Запись ${record.id}: "${material.substring(0, 100)}..."`);
+              console.log(`📝 Запись ${record.id}: найдено фраз в кавычках: ${materialPhrases.length}`);
+              if (materialPhrases.length > 0) {
+                console.log(`   Фразы: ${materialPhrases.join(', ')}`);
+              }
             }
           }
         } catch (recordError) {
@@ -844,102 +834,19 @@ class SafeLinkCore {
     
     const phrases = [];
     
-    // Сначала попробуем извлечь названия в кавычках (приоритет)
-    const quotedMatches = text.match(/"([^"]+)"/g);
-    if (quotedMatches) {
-      quotedMatches.forEach(match => {
-        const title = match.replace(/"/g, '').trim();
-        if (title.length >= 3 && title.length <= 200 && !this.isStopWord(title)) {
-          phrases.push(title.toLowerCase());
-          
-          // Также добавляем отдельные значимые слова из названия
-          const titleWords = title.toLowerCase().split(/\s+/);
-          titleWords.forEach(word => {
-            if (word.length >= 3 && !this.isStopWord(word) && !this.isNumber(word)) {
-              phrases.push(word);
-            }
-          });
-        }
-      });
-    }
-    
-    // Извлекаем названия между «»
-    const russianQuotedMatches = text.match(/«([^»]+)»/g);
-    if (russianQuotedMatches) {
-      russianQuotedMatches.forEach(match => {
-        const title = match.replace(/[«»]/g, '').trim();
-        if (title.length >= 3 && title.length <= 200 && !this.isStopWord(title)) {
-          phrases.push(title.toLowerCase());
-          
-          // Также добавляем отдельные значимые слова
-          const titleWords = title.toLowerCase().split(/\s+/);
-          titleWords.forEach(word => {
-            if (word.length >= 3 && !this.isStopWord(word) && !this.isNumber(word)) {
-              phrases.push(word);
-            }
-          });
-        }
-      });
-    }
-    
-    // Очищаем текст от HTML тегов и лишних символов
-    const cleanText = text
-      .replace(/<[^>]*>/g, ' ')  // Удаляем HTML теги
-      .replace(/&[a-zA-Z]+;/g, ' ')  // Удаляем HTML entities
-      .replace(/[^\u0400-\u04FF\u0500-\u052F\w\s\-«»""№:.()]/g, ' ')  // Оставляем больше символов
-      .replace(/\s+/g, ' ')  // Объединяем множественные пробелы
-      .trim()
-      .toLowerCase();
-    
-    if (!cleanText) return phrases;
-    
-    // Разбиваем на слова
-    const words = cleanText.split(/\s+/);
-    
-    // Извлекаем фразы длиной 1-8 слов (увеличил для полных названий)
-    for (let length = 1; length <= Math.min(8, words.length); length++) {
-      for (let start = 0; start <= words.length - length; start++) {
-        const phrase = words.slice(start, start + length).join(' ').trim();
-        
-        // Фильтруем слишком короткие или слишком длинные фразы
-        if (phrase.length >= 3 && phrase.length <= 150) {
-          // Исключаем служебные слова и номера
-          if (!this.isStopWord(phrase) && !this.isNumber(phrase)) {
-            phrases.push(phrase);
-          }
-        }
-      }
-    }
-    
-    // Извлекаем типы материалов с их названиями
-    const materialTypePatterns = [
-      /брошюра\s+"([^"]+)"/gi,
-      /книга\s+"([^"]+)"/gi,
-      /кинофильм\s+"([^"]+)"/gi,
-      /альбом\s+"([^"]+)"/gi,
-      /газета\s+"([^"]+)"/gi,
-      /журнал\s+"([^"]+)"/gi,
-      /статья\s+"([^"]+)"/gi,
-      /материал\s+"([^"]+)"/gi,
-      /песня\s+"([^"]+)"/gi,
-      /фильм\s+"([^"]+)"/gi,
-      /видео\s+"([^"]+)"/gi,
-      /аудио\s+"([^"]+)"/gi,
-      /текст\s+"([^"]+)"/gi
+    // Извлекаем только фразы в кавычках "" и «»
+    const allQuotedMatches = [
+      ...(text.match(/"([^"]+)"/g) || []),
+      ...(text.match(/«([^»]+)»/g) || [])
     ];
     
-    materialTypePatterns.forEach(pattern => {
-      const matches = text.match(pattern);
-      if (matches) {
-        matches.forEach(match => {
-          const titleMatch = match.match(/"([^"]+)"/);
-          if (titleMatch) {
-            const title = titleMatch[1].trim().toLowerCase();
-            if (title.length >= 3 && title.length <= 150 && !this.isStopWord(title)) {
-              phrases.push(title);
-            }
-          }
-        });
+    allQuotedMatches.forEach(match => {
+      // Очищаем от кавычек
+      const phrase = match.replace(/[""«»]/g, '').trim();
+      
+      // Фильтруем по длине и проверяем что это не служебное слово
+      if (phrase.length >= 3 && phrase.length <= 200 && !this.isStopWord(phrase)) {
+        phrases.push(phrase.toLowerCase());
       }
     });
     
@@ -1081,9 +988,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             console.error('❌ Background: reloadSiteLists failed:', error);
             sendResponse({ success: false, error: error.message });
           }
+                    break;
+          
+        case 'clearAllPhrases':
+          console.log('🗑️ Background: clearAllPhrases received');
+          try {
+            // Очищаем фразы в памяти
+            safeLinkCore.blockedPhrases = new Set();
+            
+            // Очищаем из storage
+            await chrome.storage.local.remove([
+              'safelink_minjust_phrases',
+              'safelink_minjust_timestamp'
+            ]);
+            
+            console.log('✅ Все фразы очищены из памяти и storage');
+            sendResponse({ 
+              success: true, 
+              message: 'Все фразы успешно удалены'
+            });
+          } catch (error) {
+            console.error('❌ Background: clearAllPhrases failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
           break;
-
-      case 'allowSite':
+ 
+        case 'allowSite':
         if (request.url) {
           try {
             const domain = new URL(request.url).hostname;

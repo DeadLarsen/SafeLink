@@ -234,27 +234,36 @@ class SafeLinkOptions {
     // Debounce для поиска
     this.searchTimeout = null;
     
-    // Обновить фразы сейчас
-    /*
-    document.getElementById('updatePhrases').addEventListener('click', async () => {
-      const button = document.getElementById('updatePhrases');
+    // Обновление фраз с новым алгоритмом
+    document.getElementById('updatePhrasesNew').addEventListener('click', async () => {
+      const button = document.getElementById('updatePhrasesNew');
       const originalText = button.textContent;
       
       try {
-        button.textContent = '🔄 Обновление...';
+        button.textContent = '🔄 Очистка и обновление...';
         button.disabled = true;
         
+        // Сначала очищаем старые данные
+        console.log('🗑️ Очищаем старые фразы...');
+        await chrome.storage.local.remove(['safelink_minjust_phrases', 'safelink_minjust_timestamp']);
+        
+        // Обновляем информацию (покажет 0 фраз)
+        await this.updatePhrasesInfo();
+        
+        button.textContent = '🔄 Загрузка новых фраз...';
+        
+        // Затем загружаем новые данные
         const response = await chrome.runtime.sendMessage({
           action: 'updatePhrasesFromMinJust'
         });
         
         if (response && response.success) {
-          this.showNotification(`✅ Загружено ${response.count} фраз`, 'success');
+          this.showNotification(`✅ Успешно! Загружено ${response.count} фраз (только в кавычках)`, 'success');
           await this.updatePhrasesInfo();
           
           // Обновляем список фраз, если он открыт
           if (this.phrasesListVisible) {
-            this.currentPage = 1; // Сбрасываем на первую страницу
+            this.currentPage = 1;
             this.loadPhrasesList();
           }
         } else {
@@ -268,7 +277,6 @@ class SafeLinkOptions {
         button.disabled = false;
       }
     });
-    */
     
     // Очистить кэш фраз
     document.getElementById('clearPhrasesCache').addEventListener('click', async () => {
@@ -324,6 +332,51 @@ class SafeLinkOptions {
       }
     });
     */
+    
+    // Полная очистка всех фраз
+    document.getElementById('clearAllPhrases').addEventListener('click', async () => {
+      if (confirm('Вы уверены, что хотите полностью очистить все загруженные фразы? Это действие нельзя отменить.')) {
+        const button = document.getElementById('clearAllPhrases');
+        const originalText = button.textContent;
+        
+        try {
+          button.textContent = '🗑️ Очистка...';
+          button.disabled = true;
+          
+          // Очищаем все данные, связанные с фразами
+          await chrome.storage.local.remove([
+            'safelink_minjust_phrases',
+            'safelink_minjust_timestamp'
+          ]);
+          
+          // Также очищаем фразы в background script
+          const response = await chrome.runtime.sendMessage({
+            action: 'clearAllPhrases'
+          });
+          
+          if (response && response.success) {
+            this.showNotification('🗑️ Все фразы успешно удалены', 'success');
+          } else {
+            this.showNotification('⚠️ Локальные данные очищены, но проверьте background script', 'warning');
+          }
+          
+          // Обновляем информацию
+          await this.updatePhrasesInfo();
+          
+          // Очищаем список фраз, если он открыт
+          if (this.phrasesListVisible) {
+            this.loadPhrasesList();
+          }
+          
+        } catch (error) {
+          console.error('Ошибка очистки фраз:', error);
+          this.showNotification('❌ Ошибка очистки фраз', 'error');
+        } finally {
+          button.textContent = originalText;
+          button.disabled = false;
+        }
+      }
+    });
     
     // Загружаем информацию о фразах при инициализации
     this.updatePhrasesInfo();
