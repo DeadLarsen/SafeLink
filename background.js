@@ -1776,6 +1776,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Инициализируем разрешенные сайты по умолчанию только при первой установке
   if (details.reason === 'install') {
     await initializeDefaultAllowedSites();
+    
+    // Устанавливаем флаг что инициализация выполнена
+    await chrome.storage.local.set({
+      'safelink_default_sites_initialized': true
+    });
+    
+    console.log('✅ SafeLink: Флаг инициализации популярных сайтов установлен');
   }
 });
 

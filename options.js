@@ -34,6 +34,9 @@ class SafeLinkOptions {
       this.blockedSites = listsResult.custom_blocked_sites || [];
       this.allowedSites = listsResult.custom_allowed_sites || [];
 
+      // Проверяем нужно ли инициализировать популярные сайты при первом запуске
+      await this.checkAndInitializeDefaultSites();
+
       // Загружаем статистику
       const statsResult = await chrome.storage.local.get(['safelink_stats']);
       this.stats = statsResult.safelink_stats || {
@@ -43,6 +46,42 @@ class SafeLinkOptions {
       };
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
+    }
+  }
+
+  async checkAndInitializeDefaultSites() {
+    try {
+      // Проверяем, были ли уже инициализированы популярные сайты
+      const initResult = await chrome.storage.local.get(['safelink_default_sites_initialized']);
+      const isInitialized = initResult.safelink_default_sites_initialized;
+
+      // Если список разрешенных сайтов пуст или не инициализирован - добавляем популярные
+      if (!isInitialized && this.allowedSites.length === 0) {
+        console.log('📱 SafeLink Options: Первый запуск - инициализируем популярные сайты...');
+        
+        const response = await chrome.runtime.sendMessage({
+          action: 'addDefaultAllowedSites'
+        });
+        
+        if (response && response.success) {
+          // Перезагружаем списки после добавления
+          const listsResult = await chrome.storage.local.get(['custom_allowed_sites']);
+          this.allowedSites = listsResult.custom_allowed_sites || [];
+          
+          // Отмечаем что инициализация выполнена
+          await chrome.storage.local.set({
+            'safelink_default_sites_initialized': true
+          });
+          
+          console.log(`✅ SafeLink Options: ${response.message}`);
+        }
+      } else if (isInitialized) {
+        console.log('ℹ️ SafeLink Options: Популярные сайты уже инициализированы ранее');
+      } else {
+        console.log('ℹ️ SafeLink Options: У пользователя уже есть разрешенные сайты, автоинициализация пропущена');
+      }
+    } catch (error) {
+      console.error('❌ SafeLink Options: Ошибка инициализации популярных сайтов:', error);
     }
   }
 
