@@ -27,6 +27,7 @@ class SafeLinkCore {
 
   async init() {
     await this.loadSettings();
+    await this.initializePhrases(); // Новая функция для инициализации фраз
     await this.loadBlockedSites();
     this.setupEventListeners();
   }
@@ -209,55 +210,12 @@ class SafeLinkCore {
       
       console.log(`SafeLink: Загружено ${this.blockedSites.size} заблокированных сайтов`);
       
-      // Загружаем заблокированные фразы
-      await this.loadBlockedPhrases();
-      
     } catch (error) {
       console.error('SafeLink: Ошибка загрузки списка сайтов:', error);
     }
   }
 
-  async loadBlockedPhrases() {
-    try {
-      // Сначала загружаем локальные фразы как fallback
-      let phrasesData = {};
-      try {
-        const response = await fetch(chrome.runtime.getURL('blocked-phrases.json'));
-        phrasesData = await response.json();
-        console.log('📁 SafeLink: Локальные фразы загружены как fallback');
-      } catch (error) {
-        console.warn('⚠️ SafeLink: Не удалось загрузить локальные фразы:', error);
-      }
-      
-      // Пытаемся загрузить обновленные фразы с Минюста
-      if (this.settings.autoUpdatePhrases) {
-        const updatedPhrases = await this.loadPhrasesFromMinJust();
-        if (updatedPhrases && updatedPhrases.size > 0) {
-          console.log('🌐 SafeLink: Используем обновленные фразы с Минюста');
-          this.blockedPhrases = updatedPhrases;
-        } else {
-          console.log('📁 SafeLink: Используем локальные фразы');
-          this.blockedPhrases = new Set(phrasesData.all_phrases || []);
-        }
-      } else {
-        console.log('📁 SafeLink: Автообновление отключено, используем локальные фразы');
-        this.blockedPhrases = new Set(phrasesData.all_phrases || []);
-      }
-      
-      this.phraseCategories = phrasesData.categories || {};
-      
-      // Обновляем список поисковых систем
-      if (phrasesData.search_engines) {
-        this.searchEngines = new Set(phrasesData.search_engines);
-      }
-      
-      console.log(`SafeLink: Загружено ${this.blockedPhrases.size} заблокированных фраз`);
-      console.log(`Категории: книги(${this.phraseCategories.books?.length || 0}), сайты(${this.phraseCategories.websites?.length || 0}), общие(${this.phraseCategories.general?.length || 0})`);
-      
-    } catch (error) {
-      console.error('SafeLink: Ошибка загрузки списка фраз:', error);
-    }
-  }
+
 
   setupEventListeners() {
     // Перехватываем навигацию
@@ -983,6 +941,80 @@ class SafeLinkCore {
       return decoder.decode(arrayBuffer);
     }
   }
+
+  async initializePhrases() {
+    try {
+      const cached = await chrome.storage.local.get(['safelink_minjust_phrases', 'safelink_initialized']);
+      const currentPhrases = cached.safelink_minjust_phrases || [];
+      const isInitialized = cached.safelink_initialized;
+      
+      // Если фраз слишком много или приложение не инициализировано, очищаем и загружаем из файла
+      if (currentPhrases.length > 50000 || !isInitialized) {
+        console.log(`🔄 SafeLink: Инициализация фраз. Старых фраз: ${currentPhrases.length}, инициализировано: ${isInitialized}`);
+        
+        // Очищаем старые фразы
+        await chrome.storage.local.remove(['safelink_minjust_phrases', 'safelink_minjust_timestamp']);
+        console.log('🗑️ SafeLink: Старые фразы очищены');
+        
+        // Загружаем из локального файла
+        try {
+          await this.loadPhrasesFromLocalFile();
+          
+          // Помечаем как инициализированное
+          await chrome.storage.local.set({ 'safelink_initialized': true });
+          console.log('✅ SafeLink: Инициализация завершена');
+        } catch (error) {
+          console.error('❌ SafeLink: Ошибка загрузки из локального файла:', error);
+        }
+      } else {
+        console.log(`✅ SafeLink: Фразы уже инициализированы (${currentPhrases.length} фраз)`);
+        this.blockedPhrases = new Set(currentPhrases);
+      }
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка инициализации фраз:', error);
+    }
+  }
+
+  async loadPhrasesFromLocalFile() {
+    try {
+      console.log('📁 SafeLink: Загружаем фразы из локального файла exportfsm.csv...');
+      
+      // Загружаем локальный файл
+      const response = await fetch(chrome.runtime.getURL('exportfsm.csv'));
+      
+      if (!response.ok) {
+        throw new Error(`Локальный файл не найден: ${response.status}`);
+      }
+      
+      // Получаем как ArrayBuffer для обработки кодировки CP1251
+      const arrayBuffer = await response.arrayBuffer();
+      console.log(`📊 SafeLink: Загружен локальный CSV, размер: ${Math.round(arrayBuffer.byteLength / 1024)} KB`);
+      
+      // Декодируем CP1251 в UTF-8 (используем существующую функцию)
+      const csvText = this.decodeWindows1251(arrayBuffer);
+      
+      // Парсим CSV (используем существующую функцию)
+      const phrases = await this.parseMinJustCSV(csvText);
+      
+      if (phrases && phrases.size > 0) {
+        // Сохраняем в кэш
+        await chrome.storage.local.set({
+          'safelink_minjust_phrases': Array.from(phrases),
+          'safelink_minjust_timestamp': Date.now()
+        });
+        
+        this.blockedPhrases = phrases;
+        console.log(`✅ SafeLink: Загружены фразы из локального файла: ${phrases.size} фраз`);
+        return phrases;
+      } else {
+        throw new Error('Не удалось извлечь фразы из локального файла');
+      }
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка загрузки локального файла:', error);
+      throw error;
+    }
+  }
 }
 
 // Обработчик сообщений от popup и content scripts
@@ -1047,6 +1079,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
           } catch (error) {
             console.error('❌ Background: clearAllPhrases failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+          
+        case 'loadPhrasesFromLocalFile':
+          console.log('📁 Background: loadPhrasesFromLocalFile received');
+          try {
+            const phrases = await safeLinkCore.loadPhrasesFromLocalFile();
+            if (phrases && phrases.size > 0) {
+              safeLinkCore.blockedPhrases = phrases;
+              // Помечаем как инициализированное
+              await chrome.storage.local.set({ 'safelink_initialized': true });
+              sendResponse({ 
+                success: true, 
+                count: phrases.size,
+                message: 'Фразы успешно загружены из локального файла'
+              });
+            } else {
+              sendResponse({ success: false, error: 'Не удалось загрузить фразы из файла' });
+            }
+          } catch (error) {
+            console.error('❌ Background: loadPhrasesFromLocalFile failed:', error);
             sendResponse({ success: false, error: error.message });
           }
           break;

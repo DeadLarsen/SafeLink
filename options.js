@@ -378,6 +378,44 @@ class SafeLinkOptions {
       }
     });
     
+    // Загрузка фраз из локального файла
+    document.getElementById('initPhrasesFromFile').addEventListener('click', async () => {
+      const button = document.getElementById('initPhrasesFromFile');
+      const originalText = button.textContent;
+      
+      try {
+        button.textContent = '📁 Загрузка из файла...';
+        button.disabled = true;
+        
+        // Сначала очищаем старые данные
+        await chrome.storage.local.remove(['safelink_minjust_phrases', 'safelink_minjust_timestamp', 'safelink_initialized']);
+        
+        // Запрашиваем загрузку из локального файла
+        const response = await chrome.runtime.sendMessage({
+          action: 'loadPhrasesFromLocalFile'
+        });
+        
+        if (response && response.success) {
+          this.showNotification(`✅ Загружено ${response.count} фраз из локального файла`, 'success');
+          await this.updatePhrasesInfo();
+          
+          // Обновляем список фраз, если он открыт
+          if (this.phrasesListVisible) {
+            this.currentPage = 1;
+            this.loadPhrasesList();
+          }
+        } else {
+          this.showNotification(`❌ Ошибка: ${response?.error || 'Неизвестная ошибка'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки из файла:', error);
+        this.showNotification('❌ Ошибка загрузки из файла', 'error');
+      } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    });
+    
     // Загружаем информацию о фразах при инициализации
     this.updatePhrasesInfo();
   }
