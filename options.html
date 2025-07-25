@@ -24,7 +24,7 @@
         <nav class="navigation">
             <button class="nav-btn active" data-tab="protection">🛡️ Защита</button>
             <button class="nav-btn" data-tab="lists">📋 Списки</button>
-            <button class="nav-btn" data-tab="pro">⭐ PRO</button>
+            <button class="nav-btn" data-tab="pro" style="display: none;">⭐ PRO</button>
             <button class="nav-btn" data-tab="stats">📊 Статистика</button>
             <button class="nav-btn" data-tab="about">ℹ️ О программе</button>
         </nav>
@@ -126,6 +126,16 @@
                 </div>
 
                 <div class="section">
+                    <h2>Управление списками</h2>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="exportLists">📥 Экспорт списков</button>
+                        <button class="btn btn-secondary" id="importLists">📤 Импорт списков</button>
+                        <button class="btn btn-danger" id="resetLists">🔄 Сбросить списки</button>
+                    </div>
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </div>
+
+                <div class="section">
                     <h2>🔤 Запрещенные фразы (Минюст РФ)</h2>
                     <div class="phrases-info" id="phrasesInfo">
                         <div class="info-grid">
@@ -194,16 +204,6 @@
                     <!--div class="phrases-note">
                         <p><strong>Примечание:</strong> Данные загружаются с официального сайта Министерства юстиции РФ (minjust.gov.ru) в соответствии с требованиями законодательства. Запросы ограничены до одного раза в 5 секунд для снижения нагрузки на сервер.</p>
                     </div-->
-                </div>
-
-                <div class="section">
-                    <h2>Управление списками</h2>
-                    <div class="button-group">
-                        <button class="btn btn-secondary" id="exportLists">📥 Экспорт списков</button>
-                        <button class="btn btn-secondary" id="importLists">📤 Импорт списков</button>
-                        <button class="btn btn-danger" id="resetLists">🔄 Сбросить списки</button>
-                    </div>
-                    <input type="file" id="importFile" accept=".json" style="display: none;">
                 </div>
 
                 <div class="section">
@@ -400,7 +400,7 @@
                             <li>PRO версия с облачной синхронизацией</li>
                         </ul>
 
-                        <h3>Поддержка</h3>
+                        <!--h3>Поддержка</h3>
                         <div class="support-links">
                             <a href="https://safelink-support.com" class="support-link" target="_blank">
                                 📖 Документация
@@ -411,7 +411,7 @@
                             <a href="https://github.com/safelink/chrome-extension" class="support-link" target="_blank">
                                 🐛 Сообщить об ошибке
                             </a>
-                        </div>
+                        </div-->
 
                         <div class="copyright">
                             <p>&copy; 2024 SafeLink. Все права защищены.</p>
