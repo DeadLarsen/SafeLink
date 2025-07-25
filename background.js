@@ -4,6 +4,7 @@ class SafeLinkCore {
     this.blockedSites = new Set();
     this.allowedSites = new Set();
     this.blockedPhrases = new Set();
+    this.phrasesExceptions = new Set(); // Фразы-исключения
     this.phraseCategories = {};
     this.ignoredSearchUrls = new Set(); // URLs которые пользователь решил продолжить
     this.searchEngines = new Set([
@@ -28,6 +29,7 @@ class SafeLinkCore {
   async init() {
     await this.loadSettings();
     await this.initializePhrases(); // Новая функция для инициализации фраз
+    await this.loadPhrasesExceptions(); // Загружаем исключения
     await this.loadBlockedSites();
     this.setupEventListeners();
   }
@@ -811,9 +813,9 @@ class SafeLinkCore {
       phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
       phrase = phrase.replace(/\s+/g, ' ').trim();
       
-      if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase)) {
-        phrases.push(phrase.toLowerCase());
-      }
+              if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase) && !this.isException(phrase)) {
+          phrases.push(phrase.toLowerCase());
+        }
     }
     
     // Затем ищем обычные кавычки (но исключаем уже найденные области с двойными кавычками)
@@ -840,13 +842,21 @@ class SafeLinkCore {
         phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
         phrase = phrase.replace(/\s+/g, ' ').trim();
         
-        if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase)) {
+        if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase) && !this.isException(phrase)) {
           phrases.push(phrase.toLowerCase());
         }
       }
     });
     
     return [...new Set(phrases)]; // Убираем дубликаты
+  }
+
+  isException(phrase) {
+    if (!phrase || typeof phrase !== 'string') return false;
+    
+    // Проверяем точное совпадение (регистронезависимо)
+    const lowerPhrase = phrase.toLowerCase().trim();
+    return this.phrasesExceptions.has(lowerPhrase);
   }
 
   isStopWord(phrase) {
@@ -1020,6 +1030,28 @@ class SafeLinkCore {
     } catch (error) {
       console.error('❌ SafeLink: Ошибка обновления CSV файла:', error);
       throw error;
+    }
+  }
+
+  async loadPhrasesExceptions() {
+    try {
+      console.log('📋 SafeLink: Загружаем фразы-исключения...');
+      
+      const response = await fetch(chrome.runtime.getURL('phrases-exceptions.json'));
+      if (!response.ok) {
+        throw new Error(`Не удалось загрузить файл исключений: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      this.phrasesExceptions = new Set(data.exceptions.map(phrase => phrase.toLowerCase()));
+      
+      console.log(`✅ SafeLink: Загружено ${this.phrasesExceptions.size} фраз-исключений`);
+      return this.phrasesExceptions;
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка загрузки исключений:', error);
+      this.phrasesExceptions = new Set(); // Пустой Set в случае ошибки
+      return this.phrasesExceptions;
     }
   }
 

@@ -53,7 +53,8 @@
         "warning-extension.js",
         "warning-phrase.html",
         "warning-phrase.js",
-        "exportfsm.csv"
+        "exportfsm.csv",
+        "phrases-exceptions.json"
       ],
       "matches": ["<all_urls>"]
     }
