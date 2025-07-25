@@ -782,7 +782,11 @@ class SafeLinkCore {
             if (processed <= 5) {
               console.log(`📝 Запись ${record.id}: найдено фраз в кавычках: ${materialPhrases.length}`);
               if (materialPhrases.length > 0) {
-                console.log(`   Фразы: ${materialPhrases.join(', ')}`);
+                console.log(`   Исходный текст: "${material.substring(0, 120)}..."`);
+                console.log(`   Извлеченные фразы: ${materialPhrases.join(', ')}`);
+              } else {
+                console.log(`   Исходный текст: "${material.substring(0, 120)}..."`);
+                console.log(`   → Нет фраз в кавычках ≥5 символов`);
               }
             }
           }
@@ -834,19 +838,53 @@ class SafeLinkCore {
     
     const phrases = [];
     
-    // Извлекаем только фразы в кавычках "" и «»
-    const allQuotedMatches = [
-      ...(text.match(/"([^"]+)"/g) || []),
-      ...(text.match(/«([^»]+)»/g) || [])
+    // Сначала обрабатываем двойные кавычки из CSV (""название"")
+    // Используем более безопасное регулярное выражение
+    const doubleQuotedPattern = /""([^"]+(?:"[^"]*)?)"/g;
+    let match;
+    while ((match = doubleQuotedPattern.exec(text)) !== null) {
+      let phrase = match[1];
+      
+      // Убираем все внутренние одинарные кавычки
+      phrase = phrase.replace(/"/g, '').trim();
+      
+      // Очищаем от знаков препинания по краям
+      phrase = phrase.replace(/^[^\w\u0400-\u04FF\u0500-\u052F]+/, '');
+      phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
+      phrase = phrase.replace(/\s+/g, ' ').trim();
+      
+      if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase)) {
+        phrases.push(phrase.toLowerCase());
+      }
+    }
+    
+    // Затем ищем обычные кавычки (но исключаем уже найденные области с двойными кавычками)
+    let cleanedText = text;
+    // Убираем области с двойными кавычками, чтобы не дублировать
+    cleanedText = cleanedText.replace(/""[^"]*""/g, ' ');
+    
+    const quotedPatterns = [
+      /"([^"]{5,200})"/g,     // Обычные кавычки: "фраза"
+      /«([^»]{5,200})»/g,     // Русские кавычки: «фраза»
+      /'([^']{5,200})'/g,     // Одинарные кавычки: 'фраза'
+      /‚([^‚]{5,200})‚/g,     // Нижние кавычки: ‚фраза‚
+      /„([^"]{5,200})"/g,     // Немецкие кавычки: „фраза"
+      /「([^」]{5,200})」/g    // Японские кавычки: 「фраза」
     ];
     
-    allQuotedMatches.forEach(match => {
-      // Очищаем от кавычек
-      const phrase = match.replace(/[""«»]/g, '').trim();
-      
-      // Фильтруем по длине и проверяем что это не служебное слово
-      if (phrase.length >= 3 && phrase.length <= 200 && !this.isStopWord(phrase)) {
-        phrases.push(phrase.toLowerCase());
+    quotedPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(cleanedText)) !== null) {
+        let phrase = match[1].trim();
+        
+        // Убираем знаки препинания в начале и конце
+        phrase = phrase.replace(/^[^\w\u0400-\u04FF\u0500-\u052F]+/, '');
+        phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
+        phrase = phrase.replace(/\s+/g, ' ').trim();
+        
+        if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase)) {
+          phrases.push(phrase.toLowerCase());
+        }
       }
     });
     
