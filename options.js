@@ -139,6 +139,27 @@ class SafeLinkOptions {
       }
     });
 
+    // Добавление популярных сайтов по умолчанию
+    document.getElementById('addDefaultAllowedSites').addEventListener('click', async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'addDefaultAllowedSites'
+        });
+        
+        if (response && response.success) {
+          // Перезагружаем данные и обновляем UI
+          await this.loadData();
+          this.updateUI();
+          this.showNotification(`✅ ${response.message}`, 'success');
+        } else {
+          this.showNotification('❌ Ошибка добавления популярных сайтов', 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка добавления популярных сайтов:', error);
+        this.showNotification('❌ Ошибка добавления популярных сайтов', 'error');
+      }
+    });
+
     // Очистка списка разрешенных сайтов
     document.getElementById('clearAllowedSites').addEventListener('click', async () => {
       if (confirm('Вы уверены, что хотите очистить весь список разрешенных сайтов?')) {

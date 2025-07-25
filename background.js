@@ -1425,6 +1425,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
           
+        case 'addDefaultAllowedSites':
+          console.log('📱 Background: addDefaultAllowedSites received');
+          try {
+            // Используем ту же функцию что и при установке
+            const result = await initializeDefaultAllowedSites();
+            
+            let message;
+            if (result.addedCount > 0) {
+              message = `Добавлено ${result.addedCount} популярных сайтов. Всего разрешенных: ${result.totalCount}`;
+            } else {
+              message = `Все популярные сайты уже присутствуют в списке (всего: ${result.totalCount})`;
+            }
+            
+            sendResponse({ 
+              success: true, 
+              message: message,
+              addedCount: result.addedCount,
+              totalCount: result.totalCount
+            });
+          } catch (error) {
+            console.error('❌ Background: addDefaultAllowedSites failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+          
         case 'getLocalFileInfo':
           console.log('📋 Background: getLocalFileInfo received');
           try {
@@ -1718,7 +1743,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Инициализируем SafeLink
-const safeLinkCore = new SafeLinkCore();
 
 // Слушаем изменения в chrome.storage для автоматической перезагрузки списков
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -1744,3 +1768,70 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
   }
 }); 
+
+// Обработчик установки расширения - инициализируем разрешенные сайты по умолчанию
+chrome.runtime.onInstalled.addListener(async (details) => {
+  console.log('🚀 SafeLink: Расширение установлено/обновлено');
+  
+  // Инициализируем разрешенные сайты по умолчанию только при первой установке
+  if (details.reason === 'install') {
+    await initializeDefaultAllowedSites();
+  }
+});
+
+// Функция инициализации разрешенных сайтов по умолчанию
+async function initializeDefaultAllowedSites() {
+  try {
+    console.log('📝 SafeLink: Инициализируем разрешенные сайты по умолчанию...');
+    
+    // Список популярных социальных сетей и платформ по умолчанию
+    const defaultAllowedSites = [
+      'vk.com',
+      'vkontakte.ru', 
+      'ok.ru',
+      'odnoklassniki.ru',
+      'youtube.com',
+      'rutube.ru',
+      'telegram.org',
+      'instagram.com',
+      'facebook.com',
+      'twitter.com',
+      'tiktok.com'
+    ];
+    
+    // Проверяем существующий список
+    const result = await chrome.storage.local.get(['custom_allowed_sites']);
+    let currentAllowed = result.custom_allowed_sites || [];
+    
+    // Добавляем только те сайты, которых еще нет
+    let addedCount = 0;
+    for (const site of defaultAllowedSites) {
+      if (!currentAllowed.includes(site)) {
+        currentAllowed.push(site);
+        addedCount++;
+      }
+    }
+    
+    if (addedCount > 0) {
+      // Сохраняем обновленный список
+      await chrome.storage.local.set({
+        'custom_allowed_sites': currentAllowed
+      });
+      
+      console.log(`✅ SafeLink: Добавлено ${addedCount} разрешенных сайтов по умолчанию`);
+      console.log(`📋 Добавленные сайты: ${defaultAllowedSites.filter(site => !result.custom_allowed_sites?.includes(site)).join(', ')}`);
+      console.log(`📋 Общий список разрешенных сайтов: ${currentAllowed.length} сайтов`);
+      
+      return { success: true, addedCount, totalCount: currentAllowed.length };
+    } else {
+      console.log('ℹ️ SafeLink: Все сайты по умолчанию уже присутствуют в разрешенных');
+      return { success: true, addedCount: 0, totalCount: currentAllowed.length };
+    }
+    
+  } catch (error) {
+    console.error('❌ SafeLink: Ошибка инициализации разрешенных сайтов по умолчанию:', error);
+  }
+}
+
+// Инициализируем SafeLink
+const safeLinkCore = new SafeLinkCore();
