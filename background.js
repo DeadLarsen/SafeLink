@@ -274,7 +274,10 @@ class SafeLinkCore {
       
       if (phraseCheck.blocked) {
         chrome.tabs.update(tabId, {
-          url: chrome.runtime.getURL('warning-phrase.html') + '?phrase=' + encodeURIComponent(phraseCheck.phrase) + '&search=' + encodeURIComponent(url)
+          url: chrome.runtime.getURL('warning-phrase.html') + 
+               '?phrase=' + encodeURIComponent(phraseCheck.phrase) + 
+               '&fullQuery=' + encodeURIComponent(phraseCheck.query) + 
+               '&search=' + encodeURIComponent(url)
         });
         return;
       }

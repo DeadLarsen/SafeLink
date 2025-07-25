@@ -4,6 +4,7 @@
 class PhraseWarningPage {
     constructor() {
         this.blockedPhrase = '';
+        this.fullQuery = '';
         this.originalSearch = '';
         this.searchEngine = '';
         this.category = 'general';
@@ -46,12 +47,23 @@ class PhraseWarningPage {
         this.debugLog('🔍 Parsing URL parameters...');
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Получаем и декодируем фразу
+        // Получаем и декодируем заблокированную фразу из списка
         this.blockedPhrase = urlParams.get('phrase') || 'неизвестная фраза';
         try {
             this.blockedPhrase = decodeURIComponent(this.blockedPhrase);
         } catch (e) {
             this.debugLog(`⚠️ Failed to decode phrase: ${e.message}`);
+        }
+        
+        // Получаем полный поисковый запрос пользователя
+        this.fullQuery = urlParams.get('fullQuery') || '';
+        try {
+            if (this.fullQuery) {
+                this.fullQuery = decodeURIComponent(this.fullQuery);
+                this.debugLog(`🔍 Full user query: ${this.fullQuery}`);
+            }
+        } catch (e) {
+            this.debugLog(`⚠️ Failed to decode full query: ${e.message}`);
         }
         
         // Получаем и декодируем исходный поисковый URL
@@ -99,10 +111,17 @@ class PhraseWarningPage {
         this.debugLog('🎨 Updating interface...');
         
         try {
-            // Обновляем заблокированную фразу
+            // Обновляем заблокированную фразу - показываем полный запрос если есть
             const phraseElement = document.getElementById('blockedPhrase');
             if (phraseElement) {
-                phraseElement.textContent = this.blockedPhrase;
+                if (this.fullQuery) {
+                    // Показываем полный запрос пользователя с выделением заблокированной фразы
+                    const displayText = this.highlightBlockedPhrase(this.fullQuery, this.blockedPhrase);
+                    phraseElement.innerHTML = displayText;
+                } else {
+                    // Fallback к старому поведению
+                    phraseElement.textContent = this.blockedPhrase;
+                }
             }
             
             // Обновляем категорию
@@ -497,6 +516,14 @@ class PhraseWarningPage {
         } catch (error) {
             this.debugLog(`⚠️ Stats update failed: ${error.message}`);
         }
+    }
+
+    // Вспомогательный метод для выделения заблокированной фразы в тексте
+    highlightBlockedPhrase(text, phrase) {
+        if (!phrase) return text;
+        const escapedPhrase = phrase.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'); // Экранируем специальные символы
+        const regex = new RegExp(`(${escapedPhrase})`, 'gi');
+        return text.replace(regex, '<span class="highlighted-phrase">$1</span>');
     }
 }
 
