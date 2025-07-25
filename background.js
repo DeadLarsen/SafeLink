@@ -609,8 +609,8 @@ class SafeLinkCore {
       const csvText = this.decodeWindows1251(arrayBuffer);
       console.log(`🔤 SafeLink: Декодирован текст в UTF-8, первые 200 символов: "${csvText.substring(0, 200)}..."`);
       
-             // Парсим CSV и извлекаем фразы
-       const newPhrases = await this.parseMinJustCSV(csvText);
+             // Парсим CSV и извлекаем фразы и URL-ы
+       const { phrases: newPhrases, blockedUrls } = await this.parseMinJustCSV(csvText);
        
        if (newPhrases.size > 0) {
          // Объединяем с существующими фразами, избегая дубликатов
@@ -637,15 +637,21 @@ class SafeLinkCore {
          this.settings.lastPhraseUpdate = now;
          await this.saveSettings();
          
-                 console.log(`✅ SafeLink: Обработано ${newPhrases.size} новых фраз, добавлено ${addedCount} уникальных, итого в базе ${finalPhrases.length}`);
-        return new Set(finalPhrases);
+         // Добавляем найденные URL-ы в заблокированные сайты
+         if (blockedUrls && blockedUrls.size > 0) {
+           await this.addUrlsToBlockedSites(blockedUrls);
+         }
+         
+         console.log(`✅ SafeLink: Обработано ${newPhrases.size} новых фраз, добавлено ${addedCount} уникальных, итого в базе ${finalPhrases.length}, URL-ов: ${blockedUrls?.size || 0}`);
+        return { phrases: new Set(finalPhrases), blockedUrls };
        } else {
          throw new Error('Не удалось извлечь фразы из CSV');
        }
       
     } catch (error) {
       console.error('❌ SafeLink: Ошибка загрузки фраз с Минюста:', error);
-      return this.getCachedPhrases();
+      const cachedPhrases = await this.getCachedPhrases();
+      return { phrases: cachedPhrases, blockedUrls: new Set() };
     }
   }
 
@@ -664,19 +670,14 @@ class SafeLinkCore {
 
   async parseMinJustCSV(csvText) {
     try {
-      console.log('🔍 SafeLink: Начинаем парсинг CSV Минюста...');
-      const phrases = new Set();
+      console.log(`📋 SafeLink: Начинаем парсинг CSV...`);
       
-      // Нормализуем переносы строк и разбиваем на строки
-      const normalizedText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      const lines = normalizedText.split('\n');
-      console.log(`📋 SafeLink: Всего строк в CSV: ${lines.length}`);
-      
-      // Находим все записи, начинающиеся с номера
+      const lines = csvText.split('\n');
       const records = [];
       let currentRecord = '';
-      let recordId = null;
+      let recordId = '';
       
+      // Парсим CSV построчно, учитывая многострочные записи
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -710,13 +711,17 @@ class SafeLinkCore {
       
       let processed = 0;
       let extracted = 0;
+      let extractedUrls = 0;
       let validRecords = 0;
+      
+      const phrases = new Set();
+      const blockedUrls = new Set();
       
       for (const record of records) {
         processed++;
         
         if (processed % 1000 === 0) {
-          console.log(`🔄 SafeLink: Обработано ${processed}/${records.length} записей, валидных: ${validRecords}, извлечено фраз: ${extracted}`);
+          console.log(`🔄 SafeLink: Обработано ${processed}/${records.length} записей, валидных: ${validRecords}, фраз: ${extracted}, URL-ов: ${extractedUrls}`);
         }
         
         try {
@@ -728,7 +733,7 @@ class SafeLinkCore {
           if (material && material.length > 0) {
             validRecords++;
             
-            // Извлекаем только фразы в кавычках из описания материала
+            // Извлекаем фразы в кавычках из описания материала
             const materialPhrases = this.extractKeyPhrases(material);
             
             materialPhrases.forEach(phrase => {
@@ -738,15 +743,27 @@ class SafeLinkCore {
               }
             });
             
+            // Извлекаем URL-ы из материала
+            const materialUrls = this.extractUrls(material);
+            materialUrls.forEach(url => {
+              blockedUrls.add(url);
+              extractedUrls++;
+            });
+            
             // Логируем первые несколько записей для отладки
             if (processed <= 5) {
-              console.log(`📝 Запись ${record.id}: найдено фраз в кавычках: ${materialPhrases.length}`);
-              if (materialPhrases.length > 0) {
+              console.log(`📝 Запись ${record.id}: фраз: ${materialPhrases.length}, URL-ов: ${materialUrls.length}`);
+              if (materialPhrases.length > 0 || materialUrls.length > 0) {
                 console.log(`   Исходный текст: "${material.substring(0, 120)}..."`);
-                console.log(`   Извлеченные фразы: ${materialPhrases.join(', ')}`);
+                if (materialPhrases.length > 0) {
+                  console.log(`   Извлеченные фразы: ${materialPhrases.slice(0, 3).join(', ')}${materialPhrases.length > 3 ? '...' : ''}`);
+                }
+                if (materialUrls.length > 0) {
+                  console.log(`   Извлеченные URL-ы: ${materialUrls.slice(0, 3).join(', ')}${materialUrls.length > 3 ? '...' : ''}`);
+                }
               } else {
                 console.log(`   Исходный текст: "${material.substring(0, 120)}..."`);
-                console.log(`   → Нет фраз в кавычках ≥5 символов`);
+                console.log(`   → Нет фраз в кавычках или URL-ов`);
               }
             }
           }
@@ -760,12 +777,14 @@ class SafeLinkCore {
       console.log(`📊 Валидных записей: ${validRecords}`);
       console.log(`📊 Извлечено фраз: ${extracted}`);
       console.log(`📊 Уникальных фраз: ${phrases.size}`);
+      console.log(`📊 Извлечено URL-ов: ${extractedUrls}`);
+      console.log(`📊 Уникальных URL-ов: ${blockedUrls.size}`);
       
-      return phrases;
+      return { phrases, blockedUrls };
       
     } catch (error) {
       console.error('❌ SafeLink: Ошибка парсинга CSV:', error);
-      return new Set();
+      return { phrases: new Set(), blockedUrls: new Set() };
     }
   }
 
@@ -900,6 +919,75 @@ class SafeLinkCore {
 
   isNumber(phrase) {
     return /^\d+$/.test(phrase) || /^\d+[\.,]\d+$/.test(phrase);
+  }
+
+  extractUrls(text) {
+    if (!text || typeof text !== 'string') return [];
+    
+    const urls = [];
+    
+    // Паттерны для поиска URL-ов
+    const urlPatterns = [
+      // http:// и https://
+      /https?:\/\/([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}([\/\w\.-]*)*\/?/g,
+      // www.domain.com (без протокола)
+      /www\.([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}([\/\w\.-]*)*\/?/g,
+      // Домены в кавычках
+      /"([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}"/g,
+      // Домены без кавычек (более строгий паттерн)
+      /\b([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b/g
+    ];
+    
+    urlPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        let url = match[0];
+        
+        // Очищаем URL от кавычек
+        url = url.replace(/['"]/g, '');
+        
+        // Убираем протокол для единообразия
+        url = url.replace(/^https?:\/\//, '');
+        url = url.replace(/^www\./, '');
+        
+        // Убираем путь, оставляем только домен
+        url = url.split('/')[0];
+        
+        // Убираем точку в конце если есть
+        url = url.replace(/\.$/, '');
+        
+        // Проверяем что это валидный домен
+        if (this.isValidDomain(url)) {
+          urls.push(url.toLowerCase());
+        }
+      }
+    });
+    
+    return [...new Set(urls)]; // Убираем дубликаты
+  }
+
+  isValidDomain(domain) {
+    if (!domain || typeof domain !== 'string') return false;
+    
+    // Проверяем основные критерии валидного домена
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    
+    if (!domainRegex.test(domain)) return false;
+    
+    // Исключаем слишком короткие или длинные домены
+    if (domain.length < 4 || domain.length > 253) return false;
+    
+    // Исключаем домены которые явно не являются веб-сайтами
+    const excludePatterns = [
+      /^\d+\.\d+\.\d+\.\d+$/, // IP адреса
+      /^localhost$/i,
+      /^127\.0\.0\.1$/,
+      /\.local$/i,
+      /\.test$/i,
+      /\.example$/i
+    ];
+    
+    return !excludePatterns.some(pattern => pattern.test(domain));
   }
 
   decodeWindows1251(arrayBuffer) {
@@ -1135,18 +1223,24 @@ class SafeLinkCore {
       const csvText = this.decodeWindows1251(arrayBuffer);
       
       // Парсим CSV (используем существующую функцию)
-      const phrases = await this.parseMinJustCSV(csvText);
+      const { phrases, blockedUrls } = await this.parseMinJustCSV(csvText);
       
       if (phrases && phrases.size > 0) {
-        // Сохраняем в кэш
+        // Сохраняем фразы в кэш
         await chrome.storage.local.set({
           'safelink_minjust_phrases': Array.from(phrases),
           'safelink_minjust_timestamp': Date.now()
         });
         
         this.blockedPhrases = phrases;
-        console.log(`✅ SafeLink: Загружены фразы из локального файла: ${phrases.size} фраз`);
-        return phrases;
+        
+        // Добавляем найденные URL-ы в заблокированные сайты
+        if (blockedUrls && blockedUrls.size > 0) {
+          await this.addUrlsToBlockedSites(blockedUrls);
+        }
+        
+        console.log(`✅ SafeLink: Загружены фразы из локального файла: ${phrases.size} фраз, URL-ов: ${blockedUrls?.size || 0}`);
+        return { phrases, blockedUrls };
       } else {
         throw new Error('Не удалось извлечь фразы из локального файла');
       }
@@ -1154,6 +1248,47 @@ class SafeLinkCore {
     } catch (error) {
       console.error('❌ SafeLink: Ошибка загрузки локального файла:', error);
       throw error;
+    }
+  }
+
+  async addUrlsToBlockedSites(blockedUrls) {
+    try {
+      if (!blockedUrls || blockedUrls.size === 0) return;
+      
+      console.log(`🌐 SafeLink: Добавляем ${blockedUrls.size} URL-ов в заблокированные сайты...`);
+      
+      // Загружаем текущие списки
+      const result = await chrome.storage.local.get(['custom_blocked_sites', 'custom_allowed_sites']);
+      const currentBlocked = new Set(result.custom_blocked_sites || []);
+      const currentAllowed = new Set(result.custom_allowed_sites || []);
+      
+      let addedCount = 0;
+      
+      // Добавляем URL-ы которых еще нет в списках
+      for (const url of blockedUrls) {
+        // Не добавляем если URL уже в разрешенных или заблокированных
+        if (!currentBlocked.has(url) && !currentAllowed.has(url)) {
+          currentBlocked.add(url);
+          addedCount++;
+        }
+      }
+      
+      if (addedCount > 0) {
+        // Сохраняем обновленный список
+        await chrome.storage.local.set({
+          'custom_blocked_sites': Array.from(currentBlocked)
+        });
+        
+        // Обновляем локальные списки
+        this.blockedSites = currentBlocked;
+        
+        console.log(`✅ SafeLink: Добавлено ${addedCount} новых заблокированных сайтов из CSV`);
+      } else {
+        console.log(`ℹ️ SafeLink: Все URL-ы из CSV уже присутствуют в списках`);
+      }
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка добавления URL-ов в заблокированные сайты:', error);
     }
   }
 }
@@ -1245,7 +1380,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             await safeLinkCore.updateLocalCSVFile();
             
             // Затем загружаем фразы из обновленного файла
-            const phrases = await safeLinkCore.loadPhrasesFromLocalFile();
+            const { phrases, blockedUrls } = await safeLinkCore.loadPhrasesFromLocalFile();
             
             if (phrases && phrases.size > 0) {
               safeLinkCore.blockedPhrases = phrases;
@@ -1266,7 +1401,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'loadPhrasesFromLocalFile':
           console.log('📁 Background: loadPhrasesFromLocalFile received');
           try {
-            const phrases = await safeLinkCore.loadPhrasesFromLocalFile();
+            const { phrases, blockedUrls } = await safeLinkCore.loadPhrasesFromLocalFile();
             if (phrases && phrases.size > 0) {
               safeLinkCore.blockedPhrases = phrases;
               // Помечаем как инициализированное
@@ -1374,7 +1509,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         try {
           // Сбрасываем timestamp последнего запроса для принудительного обновления
           safeLinkCore.lastMinJustRequest = 0;
-          const phrases = await safeLinkCore.loadPhrasesFromMinJust();
+          const { phrases, blockedUrls } = await safeLinkCore.loadPhrasesFromMinJust();
           if (phrases && phrases.size > 0) {
             safeLinkCore.blockedPhrases = phrases;
             sendResponse({ 
