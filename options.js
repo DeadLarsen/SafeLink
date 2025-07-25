@@ -114,6 +114,9 @@ class SafeLinkOptions {
     // Управление фразами
     this.setupPhrasesManagement();
     
+    // Управление исключениями фраз
+    this.setupExceptionsManagement();
+    
     // PRO функции
     this.setupProFeatures();
     
@@ -511,6 +514,106 @@ class SafeLinkOptions {
     // Загружаем информацию о фразах при инициализации
     this.updatePhrasesInfo();
     this.updateFileButtonText(); // Обновляем текст кнопки файла
+  }
+
+  setupExceptionsManagement() {
+    // Переменные состояния для исключений
+    this.exceptionsListVisible = false;
+    this.exceptionsCurrentPage = 1;
+    this.exceptionsPerPage = 10;
+    this.exceptionsSearchTerm = '';
+    this.exceptionsSortBy = 'alphabetical';
+    
+    // Добавление нового исключения
+    document.getElementById('addException').addEventListener('click', async () => {
+      const input = document.getElementById('newException');
+      const phrase = input.value.trim();
+      
+      if (!phrase) {
+        this.showNotification('❌ Введите фразу для добавления в исключения', 'error');
+        return;
+      }
+      
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'addPhraseToExceptions',
+          phrase: phrase
+        });
+        
+        if (response && response.success) {
+          input.value = '';
+          this.showNotification(`✅ Фраза "${phrase}" добавлена в исключения`, 'success');
+          this.updateExceptionsInfo();
+          if (this.exceptionsListVisible) {
+            this.loadExceptionsList();
+          }
+        } else {
+          this.showNotification(`❌ Ошибка: ${response?.error || 'Неизвестная ошибка'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка добавления исключения:', error);
+        this.showNotification('❌ Ошибка добавления исключения', 'error');
+      }
+    });
+
+    // Показать/скрыть список исключений
+    document.getElementById('toggleExceptionsList').addEventListener('click', () => {
+      this.toggleExceptionsList();
+    });
+
+    // Очистить все исключения
+    document.getElementById('clearAllExceptions').addEventListener('click', async () => {
+      if (confirm('Вы уверены, что хотите удалить ВСЕ пользовательские исключения?')) {
+        try {
+          const response = await chrome.runtime.sendMessage({
+            action: 'clearUserExceptions'
+          });
+          
+          if (response && response.success) {
+            this.showNotification('✅ Все пользовательские исключения удалены', 'success');
+            this.updateExceptionsInfo();
+            if (this.exceptionsListVisible) {
+              this.loadExceptionsList();
+            }
+          } else {
+            this.showNotification('❌ Ошибка удаления исключений', 'error');
+          }
+        } catch (error) {
+          console.error('Ошибка удаления исключений:', error);
+          this.showNotification('❌ Ошибка удаления исключений', 'error');
+        }
+      }
+    });
+
+    // Поиск по исключениям
+    document.getElementById('exceptionsSearch').addEventListener('input', (e) => {
+      this.exceptionsSearchTerm = e.target.value;
+      this.exceptionsCurrentPage = 1;
+      this.debounceExceptionsSearch();
+    });
+
+    // Сортировка исключений
+    document.getElementById('exceptionsSortBy').addEventListener('change', (e) => {
+      this.exceptionsSortBy = e.target.value;
+      this.exceptionsCurrentPage = 1;
+      this.loadExceptionsList();
+    });
+
+    // Пагинация
+    document.getElementById('exceptionsPrev').addEventListener('click', () => {
+      if (this.exceptionsCurrentPage > 1) {
+        this.exceptionsCurrentPage--;
+        this.loadExceptionsList();
+      }
+    });
+
+    document.getElementById('exceptionsNext').addEventListener('click', () => {
+      this.exceptionsCurrentPage++;
+      this.loadExceptionsList();
+    });
+
+    // Инициализируем информацию об исключениях
+    this.updateExceptionsInfo();
   }
 
   async updatePhrasesInfo() {
@@ -1143,6 +1246,126 @@ class SafeLinkOptions {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // Методы для управления исключениями
+  async updateExceptionsInfo() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getUserExceptions'
+      });
+      
+      if (response && response.success) {
+        document.getElementById('exceptionsCount').textContent = response.count || 0;
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки информации об исключениях:', error);
+    }
+  }
+
+  toggleExceptionsList() {
+    this.exceptionsListVisible = !this.exceptionsListVisible;
+    const container = document.getElementById('exceptionsListContainer');
+    const button = document.getElementById('toggleExceptionsList');
+    
+    if (this.exceptionsListVisible) {
+      container.style.display = 'block';
+      button.textContent = '📋 Скрыть список';
+      this.loadExceptionsList();
+    } else {
+      container.style.display = 'none';
+      button.textContent = '📋 Показать список';
+    }
+  }
+
+  debounceExceptionsSearch() {
+    clearTimeout(this.exceptionsSearchTimeout);
+    this.exceptionsSearchTimeout = setTimeout(() => {
+      this.loadExceptionsList();
+    }, 300);
+  }
+
+  async loadExceptionsList() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getUserExceptionsList',
+        page: this.exceptionsCurrentPage,
+        perPage: this.exceptionsPerPage,
+        search: this.exceptionsSearchTerm,
+        sortBy: this.exceptionsSortBy
+      });
+      
+      if (response && response.success) {
+        this.renderExceptionsList(response.exceptions, response.total, response.filtered);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки списка исключений:', error);
+    }
+  }
+
+  renderExceptionsList(exceptions, total, filtered) {
+    const container = document.getElementById('exceptionsList');
+    const totalElement = document.getElementById('exceptionsTotal');
+    const filteredElement = document.getElementById('exceptionsFiltered');
+    const pageInfoElement = document.getElementById('exceptionsPageInfo');
+    
+    // Обновляем статистику
+    totalElement.textContent = `Всего: ${total}`;
+    filteredElement.textContent = `Показано: ${filtered}`;
+    
+    // Пагинация
+    const totalPages = Math.ceil(filtered / this.exceptionsPerPage);
+    pageInfoElement.textContent = `Страница ${this.exceptionsCurrentPage} из ${totalPages}`;
+    
+    document.getElementById('exceptionsPrev').disabled = this.exceptionsCurrentPage <= 1;
+    document.getElementById('exceptionsNext').disabled = this.exceptionsCurrentPage >= totalPages;
+    
+    // Рендерим список
+    if (exceptions.length === 0) {
+      container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Исключения не найдены</div>';
+      return;
+    }
+    
+    container.innerHTML = exceptions.map(exception => `
+      <div class="exception-item">
+        <div class="exception-text">${this.escapeHtml(exception.phrase)}</div>
+        <div class="exception-meta">
+          ${exception.source === 'user' ? '<span class="exception-source">Пользователь</span>' : '<span class="exception-source">Система</span>'}
+          ${exception.dateAdded ? `<span class="exception-date">${new Date(exception.dateAdded).toLocaleDateString('ru-RU')}</span>` : ''}
+        </div>
+        <div class="exception-actions">
+          ${exception.source === 'user' ? `
+            <button class="btn btn-sm btn-danger" onclick="safeLinkOptions.removeException('${this.escapeHtml(exception.phrase)}')">
+              🗑️ Удалить
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async removeException(phrase) {
+    if (!confirm(`Удалить исключение "${phrase}"?`)) {
+      return;
+    }
+    
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'removeUserException',
+        phrase: phrase
+      });
+      
+      if (response && response.success) {
+        this.showNotification(`✅ Исключение "${phrase}" удалено`, 'success');
+        this.updateExceptionsInfo();
+        this.loadExceptionsList();
+      } else {
+        this.showNotification('❌ Ошибка удаления исключения', 'error');
+      }
+    } catch (error) {
+      console.error('Ошибка удаления исключения:', error);
+      this.showNotification('❌ Ошибка удаления исключения', 'error');
+    }
   }
 }
 

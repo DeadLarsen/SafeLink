@@ -205,6 +205,56 @@
                     </div>
                     <input type="file" id="importFile" accept=".json" style="display: none;">
                 </div>
+
+                <div class="section">
+                    <h2>✅ Исключения фраз</h2>
+                    <div class="exceptions-info">
+                        <p>Фразы в этом списке не будут блокироваться при поиске. Вы можете добавлять исключения прямо со страницы предупреждения или управлять ими здесь.</p>
+                        <div class="exceptions-stats">
+                            <span class="exceptions-count">Исключений: <strong id="exceptionsCount">0</strong></span>
+                        </div>
+                    </div>
+                    
+                    <div class="exceptions-manager">
+                        <div class="exceptions-header">
+                            <div class="add-form">
+                                <input type="text" id="newException" placeholder="Введите фразу для добавления в исключения">
+                                <button class="btn btn-primary" id="addException">Добавить</button>
+                            </div>
+                            <div class="exceptions-actions">
+                                <button class="btn btn-secondary btn-sm" id="toggleExceptionsList">📋 Показать список</button>
+                                <button class="btn btn-danger btn-sm" id="clearAllExceptions">🗑️ Очистить все</button>
+                            </div>
+                        </div>
+                        
+                        <div class="exceptions-list-container" id="exceptionsListContainer" style="display: none;">
+                            <div class="exceptions-list-header">
+                                <div class="search-controls">
+                                    <input type="text" id="exceptionsSearch" placeholder="Поиск по исключениям..." class="search-input">
+                                    <select id="exceptionsSortBy" class="sort-select">
+                                        <option value="alphabetical">По алфавиту</option>
+                                        <option value="date">По дате добавления</option>
+                                        <option value="length">По длине</option>
+                                    </select>
+                                </div>
+                                <div class="list-stats">
+                                    <span id="exceptionsTotal">Всего: 0</span>
+                                    <span id="exceptionsFiltered">Показано: 0</span>
+                                </div>
+                            </div>
+                            
+                            <div class="exceptions-list" id="exceptionsList">
+                                <!-- Заполняется динамически -->
+                            </div>
+                            
+                            <div class="exceptions-pagination">
+                                <button class="btn btn-sm" id="exceptionsPrev">←</button>
+                                <span id="exceptionsPageInfo">Страница 1 из 1</span>
+                                <button class="btn btn-sm" id="exceptionsNext">→</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Вкладка "PRO" -->

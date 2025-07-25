@@ -543,6 +543,25 @@ class SafeLinkCore {
     
     const normalizedQuery = query.toLowerCase().trim();
     
+    // ОТЛАДКА: Логируем проверку
+    console.log(`🔍 SafeLink: isPhraseBlocked проверяет "${normalizedQuery}"`);
+    console.log(`📋 SafeLink: Размер phrasesExceptions: ${this.phrasesExceptions.size}`);
+    
+    // Проверяем, нужно ли перезагрузить исключения
+    if (this.phrasesExceptions.size < 10) {
+      console.log(`⚠️ SafeLink: Мало исключений (${this.phrasesExceptions.size}), попробуем загрузить снова`);
+      // Не блокируем выполнение, просто загружаем асинхронно
+      this.loadPhrasesExceptions();
+    }
+    
+    console.log(`🎯 SafeLink: isException("${normalizedQuery}") = ${this.isException(normalizedQuery)}`);
+    
+    // ВАЖНО: Сначала проверяем исключения
+    if (this.isException(normalizedQuery)) {
+      console.log(`✅ SafeLink: Фраза "${normalizedQuery}" найдена в исключениях`);
+      return { blocked: false, reason: 'exception' };
+    }
+    
     // Точное совпадение
     if (this.blockedPhrases.has(normalizedQuery)) {
       return {
@@ -559,6 +578,10 @@ class SafeLinkCore {
         if (blockedPhrase.length >= 4) {
           // Проверяем вхождение заблокированной фразы в запрос
           if (normalizedQuery.includes(blockedPhrase)) {
+            // Проверяем, не является ли найденная фраза исключением
+            if (this.isException(blockedPhrase)) {
+              continue; // Пропускаем заблокированную фразу, если она в исключениях
+            }
             return {
               blocked: true,
               phrase: blockedPhrase,
@@ -569,6 +592,10 @@ class SafeLinkCore {
           
           // Если режим "loose", проверяем и обратное вхождение
           if (this.settings.phraseSensitivity === 'loose' && blockedPhrase.includes(normalizedQuery)) {
+            // Проверяем, не является ли найденная фраза исключением
+            if (this.isException(blockedPhrase)) {
+              continue; // Пропускаем заблокированную фразу, если она в исключениях
+            }
             return {
               blocked: true,
               phrase: blockedPhrase,
@@ -905,7 +932,17 @@ class SafeLinkCore {
     
     // Проверяем точное совпадение (регистронезависимо)
     const lowerPhrase = phrase.toLowerCase().trim();
-    return this.phrasesExceptions.has(lowerPhrase);
+    const result = this.phrasesExceptions.has(lowerPhrase);
+    
+    // ОТЛАДКА: Логируем детальную проверку
+    if (phrase === 'весть' || lowerPhrase === 'весть') {
+      console.log(`🔍 SafeLink: isException детально для "${phrase}":`);
+      console.log(`   - lowerPhrase: "${lowerPhrase}"`);
+      console.log(`   - phrasesExceptions.has: ${result}`);
+      console.log(`   - phrasesExceptions содержит:`, Array.from(this.phrasesExceptions).slice(0, 10));
+    }
+    
+    return result;
   }
 
   isStopWord(phrase) {
@@ -1180,6 +1217,7 @@ class SafeLinkCore {
     try {
       console.log('📋 SafeLink: Загружаем фразы-исключения...');
       
+      // Загружаем предустановленные исключения из файла
       const response = await fetch(chrome.runtime.getURL('phrases-exceptions.json'));
       if (!response.ok) {
         throw new Error(`Не удалось загрузить файл исключений: ${response.status}`);
@@ -1188,13 +1226,222 @@ class SafeLinkCore {
       const data = await response.json();
       this.phrasesExceptions = new Set(data.exceptions.map(phrase => phrase.toLowerCase()));
       
-      console.log(`✅ SafeLink: Загружено ${this.phrasesExceptions.size} фраз-исключений`);
+      // Загружаем пользовательские исключения из storage
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      const userExceptions = stored[storageKey] || [];
+      
+      // Добавляем пользовательские исключения
+      userExceptions.forEach(phrase => {
+        this.phrasesExceptions.add(phrase.toLowerCase());
+      });
+      
+      console.log(`✅ SafeLink: Загружено ${data.exceptions.length} предустановленных и ${userExceptions.length} пользовательских исключений`);
+      console.log(`📊 SafeLink: Всего исключений: ${this.phrasesExceptions.size}`);
       return this.phrasesExceptions;
       
     } catch (error) {
       console.error('❌ SafeLink: Ошибка загрузки исключений:', error);
       this.phrasesExceptions = new Set(); // Пустой Set в случае ошибки
       return this.phrasesExceptions;
+    }
+  }
+
+  async addPhraseToExceptions(phrase) {
+    try {
+      console.log(`📝 SafeLink: Добавляем фразу в исключения: ${phrase}`);
+      
+      if (!phrase || typeof phrase !== 'string') {
+        return { success: false, error: 'Некорректная фраза' };
+      }
+      
+      const normalizedPhrase = phrase.toLowerCase().trim();
+      
+      if (normalizedPhrase.length < 2) {
+        return { success: false, error: 'Фраза слишком короткая' };
+      }
+      
+      // Проверяем не добавлена ли уже
+      if (this.phrasesExceptions.has(normalizedPhrase)) {
+        return { success: false, error: 'Фраза уже в списке исключений' };
+      }
+      
+      // Добавляем в память
+      this.phrasesExceptions.add(normalizedPhrase);
+      
+      // Сохраняем в storage для персистентности
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      const userExceptions = stored[storageKey] || [];
+      
+      if (!userExceptions.includes(normalizedPhrase)) {
+        userExceptions.push(normalizedPhrase);
+        await chrome.storage.local.set({
+          [storageKey]: userExceptions
+        });
+      }
+      
+      console.log(`✅ SafeLink: Фраза "${normalizedPhrase}" добавлена в исключения`);
+      console.log(`📊 SafeLink: Всего исключений: ${this.phrasesExceptions.size}`);
+      
+      return { 
+        success: true, 
+        exceptionsCount: this.phrasesExceptions.size 
+      };
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка добавления фразы в исключения:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getUserExceptions() {
+    try {
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      const userExceptions = stored[storageKey] || [];
+      
+      return {
+        count: userExceptions.length,
+        exceptions: userExceptions
+      };
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка получения пользовательских исключений:', error);
+      return { count: 0, exceptions: [] };
+    }
+  }
+
+  async getUserExceptionsList(page = 1, perPage = 10, search = '', sortBy = 'alphabetical') {
+    try {
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      const userExceptions = stored[storageKey] || [];
+      
+      // Получаем предустановленные исключения для сравнения
+      const predefinedResponse = await fetch(chrome.runtime.getURL('phrases-exceptions.json'));
+      const predefinedData = await predefinedResponse.json();
+      const predefinedSet = new Set(predefinedData.exceptions.map(phrase => phrase.toLowerCase()));
+      
+      // Формируем полный список с метаданными
+      let allExceptions = [];
+      
+      // Добавляем предустановленные
+      predefinedData.exceptions.forEach(phrase => {
+        allExceptions.push({
+          phrase: phrase,
+          source: 'predefined',
+          dateAdded: null
+        });
+      });
+      
+      // Добавляем пользовательские
+      userExceptions.forEach(phrase => {
+        if (!predefinedSet.has(phrase.toLowerCase())) {
+          allExceptions.push({
+            phrase: phrase,
+            source: 'user',
+            dateAdded: Date.now() // Приблизительная дата
+          });
+        }
+      });
+      
+      // Фильтрация
+      let filtered = allExceptions;
+      if (search) {
+        const searchLower = search.toLowerCase();
+        filtered = allExceptions.filter(exc => 
+          exc.phrase.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Сортировка
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case 'alphabetical':
+            return a.phrase.localeCompare(b.phrase);
+          case 'date':
+            return (b.dateAdded || 0) - (a.dateAdded || 0);
+          case 'length':
+            return a.phrase.length - b.phrase.length;
+          default:
+            return 0;
+        }
+      });
+      
+      // Пагинация
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const pageExceptions = filtered.slice(startIndex, endIndex);
+      
+      return {
+        exceptions: pageExceptions,
+        total: allExceptions.length,
+        filtered: filtered.length
+      };
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка получения списка исключений:', error);
+      return { exceptions: [], total: 0, filtered: 0 };
+    }
+  }
+
+  async removeUserException(phrase) {
+    try {
+      const normalizedPhrase = phrase.toLowerCase().trim();
+      
+      // Удаляем из памяти
+      this.phrasesExceptions.delete(normalizedPhrase);
+      
+      // Удаляем из storage
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      let userExceptions = stored[storageKey] || [];
+      
+      const initialLength = userExceptions.length;
+      userExceptions = userExceptions.filter(exc => exc !== normalizedPhrase);
+      
+      if (userExceptions.length < initialLength) {
+        await chrome.storage.local.set({
+          [storageKey]: userExceptions
+        });
+        
+        console.log(`✅ SafeLink: Исключение "${normalizedPhrase}" удалено`);
+        return { success: true, message: `Исключение "${phrase}" удалено` };
+      } else {
+        return { success: false, message: 'Исключение не найдено' };
+      }
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка удаления исключения:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  async clearUserExceptions() {
+    try {
+      const storageKey = 'safelink_user_exceptions';
+      const stored = await chrome.storage.local.get([storageKey]);
+      const userExceptions = stored[storageKey] || [];
+      
+      // Удаляем пользовательские исключения из памяти
+      userExceptions.forEach(phrase => {
+        this.phrasesExceptions.delete(phrase.toLowerCase());
+      });
+      
+      // Очищаем storage
+      await chrome.storage.local.set({
+        [storageKey]: []
+      });
+      
+      console.log(`✅ SafeLink: Удалено ${userExceptions.length} пользовательских исключений`);
+      return { 
+        success: true, 
+        message: `Удалено ${userExceptions.length} пользовательских исключений` 
+      };
+      
+    } catch (error) {
+      console.error('❌ SafeLink: Ошибка очистки исключений:', error);
+      return { success: false, message: error.message };
     }
   }
 
@@ -1449,6 +1696,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
           } catch (error) {
             console.error('❌ Background: addDefaultAllowedSites failed:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+          
+        case 'addPhraseToExceptions':
+          console.log('📝 Background: addPhraseToExceptions received');
+          try {
+            const phrase = request.phrase;
+            if (!phrase) {
+              sendResponse({ success: false, error: 'No phrase provided' });
+              break;
+            }
+            
+            const result = await safeLinkCore.addPhraseToExceptions(phrase);
+            
+            if (result.success) {
+              sendResponse({ 
+                success: true, 
+                message: `Фраза "${phrase}" добавлена в исключения`,
+                exceptionsCount: result.exceptionsCount
+              });
+            } else {
+              sendResponse({ success: false, error: result.error });
+            }
+          } catch (error) {
+            console.error('❌ Background: addPhraseToExceptions failed:', error);
             sendResponse({ success: false, error: error.message });
           }
           break;
@@ -1732,6 +2005,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         break;
 
+      case 'getUserExceptions':
+        console.log('📋 Background: getUserExceptions received');
+        try {
+          const result = await safeLinkCore.getUserExceptions();
+          sendResponse({ 
+            success: true, 
+            count: result.count,
+            exceptions: result.exceptions
+          });
+        } catch (error) {
+          console.error('❌ Background: getUserExceptions failed:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'getUserExceptionsList':
+        console.log('📋 Background: getUserExceptionsList received');
+        try {
+          const result = await safeLinkCore.getUserExceptionsList(
+            request.page || 1,
+            request.perPage || 10,
+            request.search || '',
+            request.sortBy || 'alphabetical'
+          );
+          sendResponse({ 
+            success: true, 
+            exceptions: result.exceptions,
+            total: result.total,
+            filtered: result.filtered
+          });
+        } catch (error) {
+          console.error('❌ Background: getUserExceptionsList failed:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'removeUserException':
+        console.log('🗑️ Background: removeUserException received');
+        try {
+          const result = await safeLinkCore.removeUserException(request.phrase);
+          sendResponse({ 
+            success: result.success,
+            message: result.message
+          });
+        } catch (error) {
+          console.error('❌ Background: removeUserException failed:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
+      case 'clearUserExceptions':
+        console.log('🗑️ Background: clearUserExceptions received');
+        try {
+          const result = await safeLinkCore.clearUserExceptions();
+          sendResponse({ 
+            success: result.success,
+            message: result.message
+          });
+        } catch (error) {
+          console.error('❌ Background: clearUserExceptions failed:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+
       default:
         console.warn('⚠️ Неизвестное действие:', request.action);
         sendResponse({ success: false, error: 'Unknown action' });
@@ -1746,6 +2083,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Инициализируем SafeLink
+const safeLinkCore = new SafeLinkCore();
 
 // Слушаем изменения в chrome.storage для автоматической перезагрузки списков
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -1829,9 +2167,6 @@ async function initializeDefaultAllowedSites() {
       });
       
       console.log(`✅ SafeLink: Добавлено ${addedCount} разрешенных сайтов по умолчанию`);
-      console.log(`📋 Добавленные сайты: ${defaultAllowedSites.filter(site => !result.custom_allowed_sites?.includes(site)).join(', ')}`);
-      console.log(`📋 Общий список разрешенных сайтов: ${currentAllowed.length} сайтов`);
-      
       return { success: true, addedCount, totalCount: currentAllowed.length };
     } else {
       console.log('ℹ️ SafeLink: Все сайты по умолчанию уже присутствуют в разрешенных');
@@ -1840,8 +2175,6 @@ async function initializeDefaultAllowedSites() {
     
   } catch (error) {
     console.error('❌ SafeLink: Ошибка инициализации разрешенных сайтов по умолчанию:', error);
+    return { success: false, error: error.message };
   }
 }
-
-// Инициализируем SafeLink
-const safeLinkCore = new SafeLinkCore();

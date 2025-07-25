@@ -926,4 +926,226 @@ body {
         flex-direction: column;
         gap: 10px;
     }
+}
+
+/* Стили для раздела исключений фраз */
+.exceptions-info {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.exceptions-info p {
+    margin: 0 0 15px 0;
+    color: #666;
+    line-height: 1.5;
+}
+
+.exceptions-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.exceptions-count {
+    color: #333;
+    font-size: 14px;
+}
+
+.exceptions-manager {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.exceptions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.exceptions-header .add-form {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    min-width: 300px;
+}
+
+.exceptions-header .add-form input {
+    flex: 1;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.exceptions-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.exceptions-list-container {
+    background: white;
+}
+
+.exceptions-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #fafbfc;
+    border-bottom: 1px solid #e9ecef;
+    gap: 20px;
+}
+
+.search-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-input {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 200px;
+}
+
+.sort-select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+}
+
+.list-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 13px;
+    color: #666;
+}
+
+.exceptions-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.exception-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.exception-item:hover {
+    background: #f8f9fa;
+}
+
+.exception-item:last-child {
+    border-bottom: none;
+}
+
+.exception-text {
+    flex: 1;
+    font-family: monospace;
+    font-size: 14px;
+    color: #333;
+    word-break: break-word;
+}
+
+.exception-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    margin: 0 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+.exception-date {
+    font-size: 11px;
+    color: #999;
+}
+
+.exception-source {
+    font-size: 11px;
+    color: #667eea;
+    background: #f0f2ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.exception-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.exception-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    min-width: auto;
+}
+
+.exceptions-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 20px;
+    background: #fafbfc;
+    border-top: 1px solid #e9ecef;
+}
+
+.exceptions-pagination .btn {
+    min-width: 40px;
+    height: 32px;
+    padding: 0;
+}
+
+/* Адаптивность для исключений */
+@media (max-width: 768px) {
+    .exceptions-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .exceptions-header .add-form {
+        min-width: auto;
+    }
+    
+    .exceptions-list-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .search-controls {
+        justify-content: center;
+    }
+    
+    .exception-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .exception-meta {
+        align-items: flex-start;
+        flex-direction: row;
+        justify-content: space-between;
+    }
 } 

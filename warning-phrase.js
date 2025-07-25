@@ -286,6 +286,17 @@ class PhraseWarningPage {
             this.debugLog('✅ Modify button listener attached');
         }
 
+        // Кнопка "Добавить в исключения"
+        const addToExceptionsBtn = document.getElementById('addToExceptionsBtn');
+        if (addToExceptionsBtn) {
+            addToExceptionsBtn.addEventListener('click', (e) => {
+                this.debugLog('👆 Add to exceptions button clicked');
+                e.preventDefault();
+                this.addToExceptions();
+            });
+            this.debugLog('✅ Add to exceptions button listener attached');
+        }
+
         // Кнопка "Продолжить"
         const continueBtn = document.getElementById('continueBtn');
         if (continueBtn) {
@@ -515,6 +526,56 @@ class PhraseWarningPage {
             }
         } catch (error) {
             this.debugLog(`⚠️ Stats update failed: ${error.message}`);
+        }
+    }
+
+    // Добавление фразы в исключения
+    async addToExceptions() {
+        this.debugLog('📝 Adding phrase to exceptions...');
+        
+        try {
+            if (!this.blockedPhrase) {
+                this.debugLog('❌ No blocked phrase to add to exceptions');
+                alert('Ошибка: не удалось определить заблокированную фразу');
+                return;
+            }
+
+            // Подтверждение от пользователя
+            const confirmMessage = `Добавить фразу "${this.blockedPhrase}" в исключения?\n\nПосле этого данная фраза больше не будет блокироваться.`;
+            
+            if (!confirm(confirmMessage)) {
+                this.debugLog('🚫 User cancelled adding to exceptions');
+                return;
+            }
+
+            this.debugLog(`📤 Sending request to add phrase to exceptions: ${this.blockedPhrase}`);
+            
+            // Отправляем запрос в background script
+            const response = await chrome.runtime.sendMessage({
+                action: 'addPhraseToExceptions',
+                phrase: this.blockedPhrase
+            });
+
+            if (response && response.success) {
+                this.debugLog('✅ Phrase successfully added to exceptions');
+                
+                // Обновляем статистику
+                this.updateStats('ignored');
+                
+                // Показываем уведомление пользователю
+                alert(`✅ Фраза "${this.blockedPhrase}" добавлена в исключения.\n\nТеперь вы можете продолжить поиск.`);
+                
+                // Автоматически продолжаем поиск
+                this.continueSearch();
+                
+            } else {
+                this.debugLog(`❌ Failed to add phrase to exceptions: ${response?.error || 'Unknown error'}`);
+                alert('❌ Ошибка при добавлении фразы в исключения.\n\nПопробуйте еще раз или обратитесь к администратору.');
+            }
+
+        } catch (error) {
+            this.debugLog(`❌ Exception in addToExceptions: ${error.message}`);
+            alert('❌ Произошла ошибка при добавлении фразы в исключения.');
         }
     }
 
