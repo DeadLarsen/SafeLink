@@ -123,6 +123,36 @@ class SafeLinkOptions {
     document.getElementById('addAllowedSite').addEventListener('click', () => {
       this.addSiteToList('allowed');
     });
+    
+    // Очистка списка заблокированных сайтов
+    document.getElementById('clearBlockedSites').addEventListener('click', async () => {
+      if (confirm('Вы уверены, что хотите очистить весь список заблокированных сайтов?')) {
+        try {
+          this.blockedSites = [];
+          await this.saveLists();
+          this.updateSiteLists();
+          this.showNotification('✅ Список заблокированных сайтов очищен', 'success');
+        } catch (error) {
+          console.error('Ошибка очистки списка:', error);
+          this.showNotification('❌ Ошибка очистки списка', 'error');
+        }
+      }
+    });
+
+    // Очистка списка разрешенных сайтов
+    document.getElementById('clearAllowedSites').addEventListener('click', async () => {
+      if (confirm('Вы уверены, что хотите очистить весь список разрешенных сайтов?')) {
+        try {
+          this.allowedSites = [];
+          await this.saveLists();
+          this.updateSiteLists();
+          this.showNotification('✅ Список разрешенных сайтов очищен', 'success');
+        } catch (error) {
+          console.error('Ошибка очистки списка:', error);
+          this.showNotification('❌ Ошибка очистки списка', 'error');
+        }
+      }
+    });
 
     // Импорт/экспорт списков
     document.getElementById('exportLists').addEventListener('click', () => {
