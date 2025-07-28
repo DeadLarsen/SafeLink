@@ -41,14 +41,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "warning.html", 
-        "blocked.html", 
-        "warning.js", 
-        "blocked.js",
-        "test.html",
-        "test.js",
-        "test-warning.html",
-        "warning-debug.html",
         "warning-extension.html",
         "warning-extension.js",
         "warning-phrase.html",

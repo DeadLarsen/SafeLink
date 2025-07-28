@@ -196,24 +196,20 @@ class SafeLinkCore {
 
   async loadBlockedSites() {
     try {
-      // Загружаем локальный список сайтов
-      const response = await fetch(chrome.runtime.getURL('blocked-sites.json'));
-      const localSites = await response.json();
-      
-      // Загружаем пользовательский список
+      // Загружаем пользовательские списки из storage
       const result = await chrome.storage.local.get(['custom_blocked_sites', 'custom_allowed_sites']);
       
-      this.blockedSites = new Set([
-        ...localSites.blocked,
-        ...(result.custom_blocked_sites || [])
-      ]);
-      
+      // Инициализируем списки только пользовательскими данными
+      this.blockedSites = new Set(result.custom_blocked_sites || []);
       this.allowedSites = new Set(result.custom_allowed_sites || []);
       
-      console.log(`SafeLink: Загружено ${this.blockedSites.size} заблокированных сайтов`);
+      console.log(`✅ SafeLink: Загружено ${this.blockedSites.size} заблокированных и ${this.allowedSites.size} разрешенных сайтов`);
       
     } catch (error) {
-      console.error('SafeLink: Ошибка загрузки списка сайтов:', error);
+      console.error('❌ SafeLink: Ошибка загрузки списка сайтов:', error);
+      // Инициализируем пустыми списками в случае ошибки
+      this.blockedSites = new Set();
+      this.allowedSites = new Set();
     }
   }
 
