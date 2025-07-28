@@ -715,7 +715,7 @@ class SafeLinkCore {
 
   async parseMinJustCSV(csvText) {
     try {
-      console.log(`📋 SafeLink: Начинаем парсинг CSV...`);
+      console.log(`📋 SafeLink: Начинаем парсинг CSV (только фразы в французских кавычках «...»)...`);
       
       const lines = csvText.split('\n');
       const records = [];
@@ -820,7 +820,7 @@ class SafeLinkCore {
       console.log(`✅ SafeLink: Парсинг завершен!`);
       console.log(`📊 Обработано записей: ${processed}`);
       console.log(`📊 Валидных записей: ${validRecords}`);
-      console.log(`📊 Извлечено фраз: ${extracted}`);
+      console.log(`📊 Извлечено фраз (только в «французских кавычках»): ${extracted}`);
       console.log(`📊 Уникальных фраз: ${phrases.size}`);
       console.log(`📊 Извлечено URL-ов: ${extractedUrls}`);
       console.log(`📊 Уникальных URL-ов: ${blockedUrls.size}`);
@@ -862,57 +862,44 @@ class SafeLinkCore {
     
     const phrases = [];
     
-    // Сначала обрабатываем двойные кавычки из CSV (""название"")
-    // Используем более безопасное регулярное выражение
-    const doubleQuotedPattern = /""([^"]+(?:"[^"]*)?)"/g;
-    let match;
-    while ((match = doubleQuotedPattern.exec(text)) !== null) {
-      let phrase = match[1];
-      
-      // Убираем все внутренние одинарные кавычки
-      phrase = phrase.replace(/"/g, '').trim();
-      
-      // Очищаем от знаков препинания по краям
-      phrase = phrase.replace(/^[^\w\u0400-\u04FF\u0500-\u052F]+/, '');
-      phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
-      phrase = phrase.replace(/\s+/g, ' ').trim();
-      
-              if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase) && !this.isException(phrase)) {
-          phrases.push(phrase.toLowerCase());
-        }
-    }
-    
-    // Затем ищем обычные кавычки (но исключаем уже найденные области с двойными кавычками)
-    let cleanedText = text;
-    // Убираем области с двойными кавычками, чтобы не дублировать
-    cleanedText = cleanedText.replace(/""[^"]*""/g, ' ');
-    
-    const quotedPatterns = [
-      /"([^"]{5,200})"/g,     // Обычные кавычки: "фраза"
-      /«([^»]{5,200})»/g,     // Русские кавычки: «фраза»
-      /'([^']{5,200})'/g,     // Одинарные кавычки: 'фраза'
-      /‚([^‚]{5,200})‚/g,     // Нижние кавычки: ‚фраза‚
-      /„([^"]{5,200})"/g,     // Немецкие кавычки: „фраза"
-      /「([^」]{5,200})」/g    // Японские кавычки: 「фраза」
-    ];
-    
-    quotedPatterns.forEach(pattern => {
-      let match;
-      while ((match = pattern.exec(cleanedText)) !== null) {
-        let phrase = match[1].trim();
-        
-        // Убираем знаки препинания в начале и конце
-        phrase = phrase.replace(/^[^\w\u0400-\u04FF\u0500-\u052F]+/, '');
-        phrase = phrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
-        phrase = phrase.replace(/\s+/g, ' ').trim();
-        
-        if (phrase.length >= 5 && phrase.length <= 200 && !this.isStopWord(phrase) && !this.isException(phrase)) {
-          phrases.push(phrase.toLowerCase());
-        }
-      }
-    });
+    // Обработка вложенных французских кавычек
+    // Пример: «TNF - «Шторм»» → две фразы: "TNF - «Шторм»" и "Шторм"
+    this.extractNestedFrenchQuotes(text, phrases);
     
     return [...new Set(phrases)]; // Убираем дубликаты
+  }
+
+  extractNestedFrenchQuotes(text, phrases) {
+    // Ищем все открывающие кавычки
+    const openQuotes = [];
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '«') {
+        openQuotes.push(i);
+      } else if (text[i] === '»' && openQuotes.length > 0) {
+        // Закрывающая кавычка - извлекаем все возможные фразы
+        while (openQuotes.length > 0) {
+          const startPos = openQuotes.pop();
+          const phrase = text.substring(startPos + 1, i).trim();
+          
+          if (phrase.length > 0) {
+            this.processPhraseCandidate(phrase, phrases);
+          }
+        }
+      }
+    }
+  }
+
+  processPhraseCandidate(phrase, phrases) {
+    // Очищаем от знаков препинания по краям
+    let cleanPhrase = phrase.replace(/^[^\w\u0400-\u04FF\u0500-\u052F]+/, '');
+    cleanPhrase = cleanPhrase.replace(/[^\w\u0400-\u04FF\u0500-\u052F]+$/, '');
+    cleanPhrase = cleanPhrase.replace(/\s+/g, ' ').trim();
+    
+    // Проверяем длину, стоп-слова и исключения
+    if (cleanPhrase.length >= 3 && cleanPhrase.length <= 200 && 
+        !this.isStopWord(cleanPhrase) && !this.isException(cleanPhrase)) {
+      phrases.push(cleanPhrase.toLowerCase());
+    }
   }
 
   isException(phrase) {
