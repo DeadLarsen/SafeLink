@@ -1,7 +1,3 @@
-# Markdown файлы (кроме README.md)
-*.md
-!README.md
-
 # Временные файлы
 *.tmp
 *.temp
