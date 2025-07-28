@@ -539,22 +539,14 @@ class SafeLinkCore {
     
     const normalizedQuery = query.toLowerCase().trim();
     
-    // ОТЛАДКА: Логируем проверку
-    console.log(`🔍 SafeLink: isPhraseBlocked проверяет "${normalizedQuery}"`);
-    console.log(`📋 SafeLink: Размер phrasesExceptions: ${this.phrasesExceptions.size}`);
-    
     // Проверяем, нужно ли перезагрузить исключения
     if (this.phrasesExceptions.size < 10) {
-      console.log(`⚠️ SafeLink: Мало исключений (${this.phrasesExceptions.size}), попробуем загрузить снова`);
-      // Не блокируем выполнение, просто загружаем асинхронно
+      console.log(`⚠️ SafeLink: Мало исключений (${this.phrasesExceptions.size}), перезагружаем`);
       this.loadPhrasesExceptions();
     }
     
-    console.log(`🎯 SafeLink: isException("${normalizedQuery}") = ${this.isException(normalizedQuery)}`);
-    
     // ВАЖНО: Сначала проверяем исключения
     if (this.isException(normalizedQuery)) {
-      console.log(`✅ SafeLink: Фраза "${normalizedQuery}" найдена в исключениях`);
       return { blocked: false, reason: 'exception' };
     }
     
@@ -928,17 +920,7 @@ class SafeLinkCore {
     
     // Проверяем точное совпадение (регистронезависимо)
     const lowerPhrase = phrase.toLowerCase().trim();
-    const result = this.phrasesExceptions.has(lowerPhrase);
-    
-    // ОТЛАДКА: Логируем детальную проверку
-    if (phrase === 'весть' || lowerPhrase === 'весть') {
-      console.log(`🔍 SafeLink: isException детально для "${phrase}":`);
-      console.log(`   - lowerPhrase: "${lowerPhrase}"`);
-      console.log(`   - phrasesExceptions.has: ${result}`);
-      console.log(`   - phrasesExceptions содержит:`, Array.from(this.phrasesExceptions).slice(0, 10));
-    }
-    
-    return result;
+    return this.phrasesExceptions.has(lowerPhrase);
   }
 
   isStopWord(phrase) {
