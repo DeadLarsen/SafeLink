@@ -186,7 +186,6 @@ chrome.storage.local = {
 ## 📞 Поддержка
 
 - **GitHub Issues**: [Создать issue](https://github.com/deadlarsen/SafeLink/issues)
-- **Email**: deadlarsen@example.com
 
 ## 🏗️ Статус разработки
 
